@@ -131,4 +131,68 @@ CREATE TABLE watch_history (
 CREATE INDEX idx_watch_history_user ON watch_history(user_id);
 CREATE INDEX idx_movies_language ON movies(language);
 CREATE INDEX idx_movies_type ON movies(type);
+-- YourStream Database Schema for PostgreSQL (Neon)
+
+-- Users Table: Stores login info and admin status
+CREATE TABLE users (
+    user_id SERIAL PRIMARY KEY,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    is_admin BOOLEAN DEFAULT FALSE, -- NEW: Admin flag
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Movies Table: Stores both movies and series metadata
+CREATE TABLE movies (
+    movie_id SERIAL PRIMARY KEY,
+    type VARCHAR(10) NOT NULL CHECK (type IN ('movie', 'series')), -- 'movie' or 'series'
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    poster_url VARCHAR(512),
+    release_date DATE,
+    genre VARCHAR(100),
+    language VARCHAR(50), -- For movies or main series language
+    rating DECIMAL(3, 1) DEFAULT 0.0
+);
+
+-- Seasons Table: Links seasons to a series
+CREATE TABLE seasons (
+    season_id SERIAL PRIMARY KEY,
+    movie_id INT NOT NULL REFERENCES movies(movie_id) ON DELETE CASCADE,
+    season_number INT NOT NULL,
+    title VARCHAR(255),
+    UNIQUE(movie_id, season_number) -- A series can't have two "Season 1"
+);
+
+-- Episodes Table: Stores individual episodes for a series
+CREATE TABLE episodes (
+    episode_id SERIAL PRIMARY KEY,
+    season_id INT NOT NULL REFERENCES seasons(season_id) ON DELETE CASCADE,
+    episode_number INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    thumbnail_url VARCHAR(512),
+    video_url VARCHAR(512) NOT NULL,
+    language VARCHAR(50), -- NEW: Language for this specific episode
+    duration_seconds INT NOT NULL,
+    UNIQUE(season_id, episode_number) -- A season can't have two "Episode 1"
+);
+
+-- Watch History Table: Tracks user progress
+CREATE TABLE watch_history (
+    watch_history_id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    movie_id INT NOT NULL REFERENCES movies(movie_id) ON DELETE CASCADE,
+    episode_id INT REFERENCES episodes(episode_id) ON DELETE CASCADE, -- Nullable for movies
+    progress_seconds INT NOT NULL,
+    total_duration_seconds INT NOT NULL,
+    last_watched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, movie_id, episode_id) -- One history entry per user/item
+);
+
+-- Indexes for faster queries
+CREATE INDEX idx_movies_type_language ON movies(type, language);
+CREATE INDEX idx_movies_genre ON movies(genre);
+CREATE INDEX idx_watch_history_user ON watch_history(user_id, last_watched_at DESC);
 
