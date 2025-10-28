@@ -1,573 +1,536 @@
+<?php
+    session_start();
+    $isLoggedIn = isset($_SESSION['user_id']);
+    $userId = $_SESSION['user_id'] ?? null;
+
+    // --- DATABASE CONNECTION (CONCEPT) ---
+    // $dsn = "pgsql:host=...;port=...;dbname=...;user=...;password=...";
+    // $pdo = new PDO($dsn);
+
+    // --- DATA FETCHING ---
+    $contentId = null;
+    $contentTitle = "Video Title";
+    $videoUrl = "https://placehold.co/1920x1080.mp4"; // Default placeholder
+    $watchTime = 0; // Default start time
+
+    // Check if it's a movie ID
+    if (isset($_GET['id'])) {
+        $contentId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+        // $sql = "SELECT id, title, video_url FROM movies WHERE id = ? AND type = 'movie'";
+        // $stmt = $pdo->prepare($sql);
+        // $stmt->execute([$contentId]);
+        // $content = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Placeholder
+        $content = ['id' => $contentId, 'title' => 'Fetched Movie Title', 'video_url' => 'https://www.w3schools.com/html/mov_bbb.mp4'];
+
+    // Check if it's an episode ID
+    } elseif (isset($_GET['episode'])) {
+        $contentId = filter_input(INPUT_GET, 'episode', FILTER_VALIDATE_INT);
+        // $sql = "SELECT e.id, e.title, e.video_url, s.movie_id 
+        //         FROM episodes e 
+        //         JOIN seasons s ON e.season_id = s.id
+        //         WHERE e.id = ?";
+        // $stmt = $pdo->prepare($sql);
+        // $stmt->execute([$contentId]);
+        // $content = $stmt->fetch(PDO::FETCH_ASSOC);
+        
+        // Placeholder
+        $content = ['id' => $contentId, 'title' => 'Fetched Episode Title', 'video_url' => 'https://www.w3schools.com/html/mov_bbb.mp4'];
+    }
+
+    if ($contentId && $content) {
+        $contentTitle = $content['title'];
+        $videoUrl = $content['video_url'];
+
+        // If user is logged in, get their watch history
+        if ($isLoggedIn) {
+            // $sql_history = "SELECT watch_time FROM watch_history WHERE user_id = ? AND content_id = ?";
+            // $stmt_history = $pdo->prepare($sql_history);
+            // $stmt_history->execute([$userId, $contentId]);
+            // $history = $stmt_history->fetch(PDO::FETCH_ASSOC);
+            
+            // if ($history) {
+            //     $watchTime = $history['watch_time'];
+            // }
+
+            // Placeholder
+            if ($contentId == 1) $watchTime = 30; // Start 30s in for movie ID 1
+        }
+    } else {
+        // If no valid ID, just stop
+        die("Content not found.");
+    }
+?>
 <!DOCTYPE html>
 <html lang="en" class="bg-black">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Now Playing - MyStream</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Playing: <?php echo htmlspecialchars($contentTitle); ?></title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* Base styles from your original player */
-        input[type="range"] {
-            -webkit-appearance: none;
-            appearance: none;
-            background: transparent;
-            cursor: pointer;
-            width: 100%;
-        }
-        input[type="range"]::-webkit-slider-runnable-track {
-            background: rgba(255, 255, 255, 0.3);
-            height: 0.25rem;
-            border-radius: 0.25rem;
-        }
-        input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            margin-top: -5px;
-            background-color: #fff;
-            height: 0.75rem;
-            width: 0.75rem;
-            border-radius: 50%;
-        }
-        input[type="range"]::-moz-range-track {
-            background: rgba(255, 255, 255, 0.3);
-            height: 0.25rem;
-            border-radius: 0.25rem;
-        }
-        input[type="range"]::-moz-range-thumb {
-            background-color: #fff;
-            height: 0.75rem;
-            width: 0.75rem;
-            border-radius: 50%;
-            border: none;
-        }
-        #video-container:hover #controls-overlay,
-        #video-container.paused #controls-overlay {
-            opacity: 1;
-        }
-        #controls-overlay {
+        /* Base styles */
+        body, html { overflow: hidden; height: 100%; }
+        video::-webkit-media-controls { display: none !important; }
+        video::-webkit-media-controls-enclosure { display: none !important; }
+        video::-webkit-media-controls-panel { display: none !important; }
+        
+        /* Custom controls container */
+        .video-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.8), transparent);
             opacity: 0;
             transition: opacity 0.3s ease-in-out;
-            background-image: linear-gradient(to top, rgba(0,0,0,0.7), transparent 30%), linear-gradient(to bottom, rgba(0,0,0,0.7), transparent 30%);
+            padding: 10px 15px 25px 15px; /* Extra padding for safe area */
         }
-        /* Style for the active track in the menus */
-        .track-option.active {
-            font-weight: bold;
-            background-color: rgba(255, 255, 255, 0.1);
+        .video-container:hover .video-controls,
+        .video-container.controls-visible .video-controls {
+            opacity: 1;
+        }
+
+        /* Seek bar custom styles */
+        input[type=range] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 5px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            outline: none;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #E50914;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        input[type=range]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: #E50914;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        
+        /* Custom menus for settings, subs, audio */
+        .controls-menu {
+            position: absolute;
+            bottom: 90px; /* Position above control bar */
+            right: 15px;
+            background-color: rgba(0, 0, 0, 0.9);
+            border-radius: 8px;
+            padding: 10px;
+            display: none; /* Hidden by default */
+            width: 200px;
+        }
+        .controls-menu-item {
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        .controls-menu-item:hover, .controls-menu-item.active {
+            background-color: rgba(255, 255, 255, 0.2);
         }
     </style>
 </head>
-<body class="font-sans">
+<body class="text-white">
 
-    <?php
-        // --- DATABASE LOGIC (CONCEPT) ---
-        session_start();
-
-        // 1. Connect to your Neon (PostgreSQL) database
-        //    $pdo = new PDO($dsn, ...);
-
-        // Check if user is logged in
-        $isLoggedIn = isset($_SESSION['user_id']);
-        $userId = $_SESSION['user_id'] ?? null;
-
-        // 2. Get the Movie or Episode ID from URL
-        $movieId = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-        $episodeId = filter_input(INPUT_GET, 'episode', FILTER_VALIDATE_INT);
+    <div id="video-container" class="w-full h-full relative flex justify-center items-center bg-black">
         
-        $videoUrl = '';
-        $title = 'Video Not Found';
-        $contentId = null;
-        $startTime = 0; // Default start time is 0
-
-        if ($movieId) {
-            // --- It's a Movie ---
-            // 3a. Fetch movie video URL from `movies` table
-            //     $stmt = $pdo->prepare("SELECT title, video_url FROM movies WHERE id = ?");
-            //     $stmt->execute([$movieId]);
-            //     $movie = $stmt->fetch();
-            //     if ($movie) {
-            //         $videoUrl = $movie['video_url'];
-            //         $title = $movie['title'];
-            //         $contentId = $movieId; // Used for history
-            //     }
+        <!-- The Video Player -->
+        <video id="video-player" class="w-full h-full" preload="metadata">
+            <!-- Source is now set by PHP -->
+            <source src="<?php echo htmlspecialchars($videoUrl); ?>" type="video/mp4">
             
-            // Placeholder:
-            // This example video has multiple audio tracks and subtitles
-            $videoUrl = 'https://cdn.bitmovin.com/content/assets/sintel/sintel.mpd';
-            $title = 'Placeholder Movie (Sintel)';
-            $contentId = $movieId;
+            <!-- Example subtitle/audio tracks. These must be part of your video file or provided as separate files -->
+            <track kind="subtitles" label="English" srclang="en" src="path/to/english.vtt">
+            <track kind="subtitles" label="Kannada" srclang="kn" src="path/to/kannada.vtt">
+            <track kind.="audio" label="English" srclang="en">
+            <track kind="audio" label="Kannada" srclang="kn">
+        </video>
 
-        } elseif ($episodeId) {
-            // --- It's a Series Episode ---
-            // 3b. Fetch episode video URL from `episodes` table
-            //     $stmt = $pdo->prepare("SELECT title, video_url FROM episodes WHERE id = ?");
-            //     $stmt->execute([$episodeId]);
-            //     $episode = $stmt->fetch();
-            //     if ($episode) {
-            //         $videoUrl = $episode['video_url'];
-            //         $title = $episode['title'];
-            //         $contentId = $episodeId; // Use episode ID for history
-            //     }
+        <!-- Loading Spinner -->
+        <div id="loading-spinner" class="absolute z-10 hidden">
+            <svg class="animate-spin h-12 w-12 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+        </div>
+        
+        <!-- Back Button (Top Left) -->
+        <a href="javascript:history.back()" class="absolute top-4 left-4 p-2 bg-black/50 rounded-full z-20">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            </svg>
+        </a>
 
-            // Placeholder:
-            $videoUrl = 'https://test-videos.co.uk/vids/sintel/mp4/480/Sintel_480_10s_1MB.mp4';
-            $title = 'Placeholder Episode';
-            $contentId = $episodeId;
-        }
+        <!-- Center Play/Pause Button -->
+        <button id="center-play-pause" class="absolute z-10 p-4 bg-black/50 rounded-full hidden">
+            <!-- Play Icon -->
+            <svg id="center-play-icon" xmlns="http://www.w3.org/2000/svg" class="h-16 w-16" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+            </svg>
+            <!-- Pause Icon (hidden by default) -->
+            <svg id="center-pause-icon" xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 hidden" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd" />
+            </svg>
+        </button>
 
-        // 4. If logged in, get the watch history
-        if ($isLoggedIn && $contentId) {
-            //    $stmt = $pdo->prepare("SELECT watch_time FROM watch_history WHERE user_id = ? AND content_id = ?");
-            //    $stmt->execute([$userId, $contentId]);
-            //    $history = $stmt->fetch();
-            //    if ($history) {
-            //        $startTime = $history['watch_time'];
-            //    }
+
+        <!-- Custom Controls -->
+        <div class="video-controls z-20">
+            <!-- Seek Bar -->
+            <input id="seek-bar" type="range" value="0" min="0" max="100" class="w-full mb-2">
             
-            // Placeholder:
-            if ($contentId == 1) $startTime = 3; // Start 3s in for placeholder movie
-        }
-    ?>
-
-    <!-- This is the player modal, now as a full page -->
-    <div id="player-page" class="fixed inset-0 bg-black z-50 flex items-center justify-center">
-        <!-- Video Container -->
-        <div id="video-container" class="relative w-full h-full bg-black">
-            
-            <!-- The actual video element -->
-            <video id="video-player" class="w-full h-full" src="<?php echo htmlspecialchars($videoUrl); ?>" playsinline crossorigin="anonymous">
-                <!-- This 'src' is loaded by PHP -->
-                <!-- Example of hard-coded tracks for demo. Real videos (like .m3u8 or .mpd) will have these built-in -->
-                <track kind="subtitles" label="English" srclang="en" src="path/to/english.vtt">
-                <track kind="subtitles" label="Español" srclang="es" src="path/to/spanish.vtt">
-            </video>
-
-            <!-- Custom Controls Overlay -->
-            <div id="controls-overlay" class="absolute inset-0 flex flex-col justify-between p-4 text-white">
-                
-                <!-- Top Controls (Back Button & Title) -->
-                <div class="flex justify-between items-center">
-                    <button id="back-button" class="p-2 rounded-full hover:bg-white/20">
-                        <!-- Back Icon -->
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                        </svg>
-                    </button>
-                    <h2 class="text-lg font-semibold"><?php echo htmlspecialchars($title); ?></h2>
-                    <div class="w-10"></div> <!-- Spacer -->
-                </div>
-
-                <!-- Middle Controls (Big Play/Pause) - Toggled by JS -->
-                <div class="flex-grow flex items-center justify-center">
-                    <button id="center-play-pause" class="p-4 rounded-full bg-black/50 hover:bg-black/75">
-                         <!-- Play Icon -->
-                        <svg id="center-play-icon" xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" viewBox="0 0 20 20" fill="currentColor">
+            <div class="flex justify-between items-center">
+                <!-- Left Controls: Play/Pause, Time -->
+                <div class="flex items-center space-x-4">
+                    <button id="play-pause-btn">
+                        <!-- Play Icon -->
+                        <svg id="play-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
                         </svg>
-                        <!-- Pause Icon (hidden by default) -->
-                        <svg id="center-pause-icon" xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 hidden" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 00-1 1v2a1 1 0 002 0V9a1 1 0 00-1-1zm6 0a1 1 0 00-1 1v2a1 1 0 002 0V9a1 1 0 00-1-1z" clip-rule="evenodd" />
+                        <!-- Pause Icon (hidden) -->
+                        <svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8 7a1 1 0 00-1 1v4a1 1 0 001 1h4a1 1 0 001-1V8a1 1 0 00-1-1H8z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    <span id="time-display" class="text-sm font-mono">00:00 / 00:00</span>
+                </div>
+                
+                <!-- Right Controls: Subs, Audio, Fullscreen -->
+                <div class="flex items-center space-x-4">
+                    <button id="subs-btn" class="hidden"> <!-- Hidden until we detect tracks -->
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M16 12a4 4 0 11-8 0 4 4 0 018 0zm-2 0a2 2 0 11-4 0 2 2 0 014 0z" />
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 4.5l15 15" />
+                        </svg>
+                    </button>
+                    <button id="audio-btn" class="hidden"> <!-- Hidden until we detect tracks -->
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .89-1.077 1.337-1.707.707L5.586 15z" />
+                        </svg>
+                    </button>
+                    <button id="fullscreen-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                          <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v4m0 0h-4m4 0l-5-5" />
                         </svg>
                     </button>
                 </div>
-
-                <!-- Pop-up Menus -->
-                <div class="absolute bottom-16 right-4 space-y-2 z-20">
-                    <!-- Subtitles Menu -->
-                    <div id="subtitles-menu" class="hidden bg-black/75 rounded-lg p-2 space-y-1 max-h-48 overflow-y-auto">
-                        <!-- Populated by JS -->
-                    </div>
-                    
-                    <!-- Audio Menu -->
-                    <div id="audio-menu" class="hidden bg-black/75 rounded-lg p-2 space-y-1 max-h-48 overflow-y-auto">
-                        <!-- Populated by JS -->
-                    </div>
-                </div>
-
-                <!-- Bottom Controls Bar -->
-                <div class="space-y-2 z-10">
-                    <!-- Seek Bar -->
-                    <div class="flex items-center space-x-2">
-                        <span id="current-time" class="text-xs w-10 text-center">0:00</span>
-                        <input id="seek-bar" type="range" value="0" min="0" max="100" class="flex-grow">
-                        <span id="duration" class="text-xs w-10 text-center">0:00</span>
-                    </div>
-                    <!-- Main Controls -->
-                    <div class="flex justify-between items-center">
-                        <button id="play-pause" class="p-2">
-                            <!-- Play Icon -->
-                            <svg id="play-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
-                            </svg>
-                            <!-- Pause Icon (hidden by default) -->
-                            <svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 00-1 1v2a1 1 0 002 0V9a1 1 0 00-1-1zm6 0a1 1 0 00-1 1v2a1 1 0 002 0V9a1 1 0 00-1-1z" clip-rule="evenodd" />
-                            </svg>
-                        </button>
-                        
-                        <div class="flex items-center space-x-2">
-                            <!-- Subtitles Button -->
-                            <button id="subtitles-button" class="p-2 hidden"> <!-- Hidden by default, shown by JS -->
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0zM10 9H8v6h2V9zm6 0h-2v6h2V9z" />
-                                </svg>
-                            </button>
-                            
-                            <!-- Audio/Language Button -->
-                            <button id="audio-button" class="p-2 hidden"> <!-- Hidden by default, shown by JS -->
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                                </svg>
-                            </button>
-                            
-                            <button id="volume-button" class="p-2">
-                                <svg id="volume-high" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9 9 0 0119 10a9 9 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7 7 0 0017 10a7 7 0 00-1.414-4.95 1 1 0 010-1.121zM16.07 4.343a1 1 0 011.414 0A5 5 0 0119 10a5 5 0 01-1.515 3.536 1 1 0 11-1.414-1.414A3 3 0 0017 10a3 3 0 00-.93-2.121 1 1 0 010-1.536z" clip-rule="evenodd" />
-                                </svg>
-                                <svg id="volume-muted" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clip-rule="evenodd" />
-                                </svg>
-                            </button>
-                            <input id="volume-bar" type="range" value="100" min="0" max="100" class="w-20">
-                            
-                            <button id="fullscreen-button" class="p-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1v4m0 0h-4m4 0l-5-5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 0h-4m4 0l-5 5" />
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
             </div>
         </div>
+
+        <!-- Subtitles Menu -->
+        <div id="subs-menu" class="controls-menu z-30">
+            <div id="subs-menu-items">
+                <!-- Items will be populated by JS -->
+            </div>
+        </div>
+
+        <!-- Audio Menu -->
+        <div id="audio-menu" class="controls-menu z-30">
+            <div id="audio-menu-items">
+                <!-- Items will be populated by JS -->
+            </div>
+        </div>
+
     </div>
 
-    <!-- Need to load HLS/DASH player if using .m3u8 or .mpd files -->
-    <!-- This is required for the example Sintel video to work -->
-    <script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
-
     <script>
-        // --- Pass PHP variables to JavaScript ---
-        const isLoggedIn = <?php echo json_encode($isLoggedIn); ?>;
-        const contentId = <?php echo json_encode($contentId); ?>;
-        const startTime = <?php echo json_encode($startTime); ?>;
-        const videoSrc = <?php echo json_encode($videoUrl); ?>;
-        // ----------------------------------------
+        // --- PHP Data Passed to JavaScript ---
+        const config = {
+            isLoggedIn: <?php echo json_encode($isLoggedIn); ?>,
+            contentId: <?php echo json_encode($contentId); ?>,
+            startWatchTime: <?php echo json_encode($watchTime); ?>
+        };
+        // -------------------------------------
 
-        document.addEventListener('DOMContentLoaded', () => {
-            const videoContainer = document.getElementById('video-container');
-            const video = document.getElementById('video-player');
-            const controlsOverlay = document.getElementById('controls-overlay');
-            const backButton = document.getElementById('back-button');
-            
-            const playPauseBtn = document.getElementById('play-pause');
-            const centerPlayPauseBtn = document.getElementById('center-play-pause');
-            const playIcons = [document.getElementById('play-icon'), document.getElementById('center-play-icon')];
-            const pauseIcons = [document.getElementById('pause-icon'), document.getElementById('center-pause-icon')];
-            
-            const seekBar = document.getElementById('seek-bar');
-            const currentTimeEl = document.getElementById('current-time');
-            const durationEl = document.getElementById('duration');
-            
-            const volumeBtn = document.getElementById('volume-button');
-            const volumeHighIcon = document.getElementById('volume-high');
-            const volumeMutedIcon = document.getElementById('volume-muted');
-            const volumeBar = document.getElementById('volume-bar');
+        const videoContainer = document.getElementById('video-container');
+        const video = document.getElementById('video-player');
+        
+        // Control Buttons
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const playIcon = document.getElementById('play-icon');
+        const pauseIcon = document.getElementById('pause-icon');
+        const centerPlayPauseBtn = document.getElementById('center-play-pause');
+        const centerPlayIcon = document.getElementById('center-play-icon');
+        const centerPauseIcon = document.getElementById('center-pause-icon');
+        const fullscreenBtn = document.getElementById('fullscreen-btn');
+        
+        // Seek & Time
+        const seekBar = document.getElementById('seek-bar');
+        const timeDisplay = document.getElementById('time-display');
+        const loadingSpinner = document.getElementById('loading-spinner');
 
-            const fullscreenBtn = document.getElementById('fullscreen-button');
+        // Menus
+        const subsBtn = document.getElementById('subs-btn');
+        const audioBtn = document.getElementById('audio-btn');
+        const subsMenu = document.getElementById('subs-menu');
+        const audioMenu = document.getElementById('audio-menu');
+        const subsMenuItems = document.getElementById('subs-menu-items');
+        const audioMenuItems = document.getElementById('audio-menu-items');
 
-            // --- Audio/Subtitle Elements ---
-            const subtitlesButton = document.getElementById('subtitles-button');
-            const audioButton = document.getElementById('audio-button');
-            const subtitlesMenu = document.getElementById('subtitles-menu');
-            const audioMenu = document.getElementById('audio-menu');
+        let controlsTimeout;
+        let lastWatchTimeUpdate = 0;
 
-            // --- Player Logic ---
-
-            // Handle HLS/DASH streams
-            if (videoSrc.endsWith('.mpd')) {
-                const player = dashjs.MediaPlayer().create();
-                player.initialize(video, videoSrc, false); // false = don't autoplay
-            } else if (videoSrc.endsWith('.m3u8')) {
-                // You would need hls.js for HLS streams
-                // <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-                // if (Hls.isSupported()) {
-                //     const hls = new Hls();
-                //     hls.loadSource(videoSrc);
-                //     hls.attachMedia(video);
-                // }
-                alert('HLS streaming not yet supported in this player.');
-            }
-            
-            // Go back to the previous page
-            backButton.addEventListener('click', () => {
-                history.back();
-            });
-            
-            function togglePlay() {
-                if (video.paused || video.ended) {
-                    video.play();
-                } else {
-                    video.pause();
-                }
-            }
-            
-            function updatePlayPauseIcons() {
-                const isPaused = video.paused;
-                videoContainer.classList.toggle('paused', isPaused); // For controls overlay
-                playIcons.forEach(icon => icon.classList.toggle('hidden', !isPaused));
-                pauseIcons.forEach(icon => icon.classList.toggle('hidden', isPaused));
-            }
-
-            function formatTime(timeInSeconds) {
-                if (isNaN(timeInSeconds)) return '0:00';
-                const minutes = Math.floor(timeInSeconds / 60);
-                const seconds = Math.floor(timeInSeconds % 60);
-                return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-            }
-
-            function updateTime() {
-                if (isNaN(video.duration)) return;
-                seekBar.value = (video.currentTime / video.duration) * 100;
-                currentTimeEl.textContent = formatTime(video.currentTime);
-            }
-
-            function seek() {
-                if (isNaN(video.duration)) return;
-                video.currentTime = (seekBar.value / 100) * video.duration;
-            }
-
-            function onVideoLoaded() {
-                if (isNaN(video.duration)) return;
-                durationEl.textContent = formatTime(video.duration);
-                
-                if (startTime > 0 && startTime < video.duration - 5) {
-                    video.currentTime = startTime;
-                }
-                
+        // --- Core Functions ---
+        
+        function togglePlayPause() {
+            if (video.paused) {
                 video.play();
-                
-                // --- Setup Tracks ---
-                // Wait a moment for tracks to be available, especially for DASH/HLS
-                setTimeout(() => {
-                    setupSubtitleTracks();
-                    setupAudioTracks();
-                }, 500);
+            } else {
+                video.pause();
             }
+        }
 
-            function toggleMute() {
-                video.muted = !video.muted;
+        function updatePlayPauseIcons() {
+            if (video.paused) {
+                playIcon.classList.remove('hidden');
+                pauseIcon.classList.add('hidden');
+                centerPlayIcon.classList.remove('hidden');
+                centerPauseIcon.classList.add('hidden');
+                centerPlayPauseBtn.classList.remove('hidden');
+            } else {
+                playIcon.classList.add('hidden');
+                pauseIcon.classList.remove('hidden');
+                centerPlayIcon.classList.add('hidden');
+                centerPauseIcon.classList.remove('hidden');
+                centerPlayPauseBtn.classList.add('hidden');
             }
+        }
 
-            function updateVolumeIcons() {
-                volumeHighIcon.classList.toggle('hidden', video.muted || video.volume === 0);
-                volumeMutedIcon.classList.toggle('hidden', !video.muted && video.volume > 0);
-            }
+        function formatTime(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = Math.floor(seconds % 60);
+            return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+        
+        function updateTimeDisplay() {
+            const currentTime = formatTime(video.currentTime);
+            const duration = formatTime(video.duration || 0);
+            timeDisplay.textContent = `${currentTime} / ${duration}`;
             
-            function setVolume() {
-                video.volume = volumeBar.value / 100;
-                video.muted = video.volume === 0;
+            if (video.duration) {
+                seekBar.value = (video.currentTime / video.duration) * 100;
             }
-            
-            function toggleFullscreen() {
-                if (!document.fullscreenElement) {
-                    document.documentElement.requestFullscreen();
-                } else {
-                    document.exitFullscreen();
-                }
-            }
+        }
 
-            // --- Subtitle/Audio Logic ---
-            function hideTrackMenus() {
-                subtitlesMenu.classList.add('hidden');
-                audioMenu.classList.add('hidden');
-            }
-
-            function setupSubtitleTracks() {
-                const tracks = video.textTracks;
-                if (!tracks || tracks.length === 0) {
-                    return; // No subtitle tracks
-                }
-
-                subtitlesButton.classList.remove('hidden');
-                subtitlesMenu.innerHTML = ''; 
-
-                const offButton = document.createElement('button');
-                offButton.classList.add('track-option', 'text-white', 'w-full', 'text-left', 'p-2', 'rounded', 'hover:bg-white/20');
-                offButton.innerText = 'Off';
-                offButton.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    [...tracks].forEach(track => track.mode = 'hidden');
-                    updateActiveTrackButton(subtitlesMenu, offButton);
-                    hideTrackMenus();
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                videoContainer.requestFullscreen().catch(err => {
+                    console.error(`Error attempting to enable full-screen mode: ${err.message}`);
                 });
-                subtitlesMenu.appendChild(offButton);
-                
-                let activeTrack = null;
-
-                [...tracks].forEach((track, index) => {
-                    track.mode = 'hidden'; // Set all to hidden by default
-                    const trackButton = document.createElement('button');
-                    trackButton.classList.add('track-option', 'text-white', 'w-full', 'text-left', 'p-2', 'rounded', 'hover:bg-white/20');
-                    trackButton.innerText = track.label || track.language || `Track ${index + 1}`;
-                    
-                    trackButton.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        [...tracks].forEach(t => t.mode = 'hidden');
-                        track.mode = 'showing';
-                        updateActiveTrackButton(subtitlesMenu, trackButton);
-                        hideTrackMenus();
-                    });
-                    
-                    subtitlesMenu.appendChild(trackButton);
-
-                    if (track.mode === 'showing') { // Check if one was showing by default
-                        activeTrack = trackButton;
-                    }
-                });
-                
-                updateActiveTrackButton(subtitlesMenu, activeTrack || offButton);
+            } else {
+                document.exitFullscreen();
             }
+        }
 
-            function setupAudioTracks() {
-                const tracks = video.audioTracks;
-                if (!tracks || tracks.length <= 1) { // 0 or 1 track means no options
-                    return; 
-                }
-
-                audioButton.classList.remove('hidden');
-                audioMenu.innerHTML = '';
-                
-                let activeTrack = null;
-
-                [...tracks].forEach((track, index) => {
-                    const trackButton = document.createElement('button');
-                    trackButton.classList.add('track-option', 'text-white', 'w-full', 'text-left', 'p-2', 'rounded', 'hover:bg-white/20');
-                    trackButton.innerText = track.label || track.language || `Audio ${index + 1}`;
-                    
-                    trackButton.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        [...tracks].forEach(t => t.enabled = false);
-                        track.enabled = true;
-                        updateActiveTrackButton(audioMenu, trackButton);
-                        hideTrackMenus();
-                    });
-                    
-                    audioMenu.appendChild(trackButton);
-
-                    if (track.enabled) {
-                        activeTrack = trackButton;
-                    }
-                });
-
-                if (activeTrack) {
-                    updateActiveTrackButton(audioMenu, activeTrack);
-                }
+        function hideControls() {
+            if (!video.paused) {
+                videoContainer.classList.remove('controls-visible');
+                subsMenu.style.display = 'none';
+                audioMenu.style.display = 'none';
             }
+        }
 
-            function updateActiveTrackButton(menu, activeButton) {
-                menu.querySelectorAll('.track-option').forEach(btn => {
-                    btn.classList.remove('active');
-                });
-                if(activeButton) {
-                    activeButton.classList.add('active');
-                }
+        function showControls() {
+            videoContainer.classList.add('controls-visible');
+            clearTimeout(controlsTimeout);
+            controlsTimeout = setTimeout(hideControls, 3000);
+        }
+
+        // --- Event Listeners ---
+
+        video.addEventListener('play', updatePlayPauseIcons);
+        video.addEventListener('pause', updatePlayPauseIcons);
+        video.addEventListener('loadedmetadata', () => {
+            updateTimeDisplay();
+            // Start video at the fetched watch time
+            if(config.startWatchTime > 0) {
+                video.currentTime = config.startWatchTime;
             }
-            
-            // --- HISTORY TRACKING (CONCEPT) ---
-            let lastUpdateTime = 0;
-            
-            function updateWatchHistory() {
-                if (!isLoggedIn || !contentId) return; 
-
-                const currentTime = Math.floor(video.currentTime);
-                const now = Date.now();
-                
-                if (currentTime > 0 && !video.paused && (now - lastUpdateTime > 15000)) {
-                    lastUpdateTime = now;
-                    
-                    const formData = new FormData();
-                    formData.append('content_id', contentId);
-                    formData.append('watch_time', currentTime);
-
-                    fetch('update_history.php', {
-                        method: 'POST',
-                        body: formData
-                    })
-                    .catch(error => console.error('Error updating history:', error));
-                }
-            }
-
-            // --- Event Listeners ---
-            playPauseBtn.addEventListener('click', togglePlay);
-            centerPlayPauseBtn.addEventListener('click', togglePlay);
-            video.addEventListener('click', (e) => {
-                if (e.target === video) { // Only toggle play if clicking video, not controls
-                   togglePlay();
-                   hideTrackMenus();
-                }
-            });
-            
-            video.addEventListener('play', updatePlayPauseIcons);
-            video.addEventListener('pause', updatePlayPauseIcons);
-            
-            video.addEventListener('loadedmetadata', onVideoLoaded);
-            video.addEventListener('canplay', onVideoLoaded); // Fallback for some browsers
-            
-            video.addEventListener('timeupdate', () => {
-                updateTime();
-                updateWatchHistory();
-            });
-            seekBar.addEventListener('input', seek);
-            
-            volumeBtn.addEventListener('click', toggleMute);
-            video.addEventListener('volumechange', updateVolumeIcons);
-            volumeBar.addEventListener('input', setVolume);
-
-            fullscreenBtn.addEventListener('click', toggleFullscreen);
-
-            // --- Track Menu Listeners ---
-            subtitlesButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-                audioMenu.classList.add('hidden');
-V                subtitlesMenu.classList.toggle('hidden');
-                // Re-check active track
-                const activeTrack = [...video.textTracks].find(t => t.mode === 'showing');
-                const buttons = subtitlesMenu.querySelectorAll('.track-option');
-                if (activeTrack) {
-                    const buttonToSelect = [...buttons].find(b => b.innerText.includes(activeTrack.label) || b.innerText.includes(activeTrack.language));
-                    updateActiveTrackButton(subtitlesMenu, buttonToSelect || buttons[0]);
-                } else {
-                    updateActiveTrackButton(subtitlesMenu, buttons[0]); // "Off" button
-                }
-            });
-
-            audioButton.addEventListener('click', (e) => {
-                e.stopPropagation();
-                subtitlesMenu.classList.add('hidden');
-                audioMenu.classList.toggle('hidden');
-                // Re-check active track
-                const activeTrack = [...video.audioTracks].find(t => t.enabled);
-                const buttons = audioMenu.querySelectorAll('.track-option');
-                if (activeTrack) {
-                    const buttonToSelect = [...buttons].find(b => b.innerText.includes(activeTrack.label) || b.innerText.includes(activeTrack.language));
-                    updateActiveTrackButton(audioMenu, buttonToSelect);
-                }
-            });
-
-            // Hide menus if clicking anywhere else on the overlay
-            controlsOverlay.addEventListener('click', (e) => {
-                if (e.target === controlsOverlay) {
-                    hideTrackMenus();
-                }
-            });
-
-            // Handle errors
-            video.addEventListener('error', (e) => {
-                console.error("Video playback error", e);
-            });
-
+            populateTrackMenus();
         });
+        video.addEventListener('timeupdate', () => {
+            updateTimeDisplay();
+            // --- Send history update every 15 seconds ---
+            const now = Date.now();
+            if (config.isLoggedIn && (now - lastWatchTimeUpdate > 15000)) {
+                lastWatchTimeUpdate = now;
+                updateWatchHistory(video.currentTime);
+            }
+        });
+        
+        // Send final history update on unload
+        window.addEventListener('beforeunload', () => {
+            if (config.isLoggedIn && video.currentTime > 0) {
+                updateWatchHistory(video.currentTime, true); // Send synchronously
+            }
+        });
+
+        // Loading states
+        video.addEventListener('waiting', () => loadingSpinner.classList.remove('hidden'));
+        video.addEventListener('playing', () => loadingSpinner.classList.add('hidden'));
+
+        // Controls visibility
+        videoContainer.addEventListener('mousemove', showControls);
+        videoContainer.addEventListener('click', (e) => {
+            // Only toggle play/pause if click is on video, not controls
+            if (e.target === videoContainer || e.target === video || e.target === centerPlayPauseBtn || centerPlayPauseBtn.contains(e.target)) {
+                togglePlayPause();
+            }
+            showControls();
+        });
+        
+        // Control buttons
+        playPauseBtn.addEventListener('click', togglePlayPause);
+        centerPlayPauseBtn.addEventListener('click', togglePlayPause);
+        fullscreenBtn.addEventListener('click', toggleFullscreen);
+
+        // Seek bar
+        seekBar.addEventListener('input', (e) => {
+            if (video.duration) {
+                video.currentTime = (e.target.value / 100) * video.duration;
+            }
+        });
+        
+        // --- Subtitle & Audio Track Logic ---
+
+        function populateTrackMenus() {
+            const textTracks = video.textTracks;
+            const audioTracks = video.audioTracks;
+
+            // Clear previous items
+            subsMenuItems.innerHTML = '';
+            audioMenuItems.innerHTML = '';
+
+            // Populate Subtitles
+            if (textTracks && textTracks.length > 0) {
+                subsBtn.classList.remove('hidden');
+                let foundActive = false;
+                
+                // Add "Off" button
+                const offItem = document.createElement('div');
+                offItem.textContent = 'Off';
+                offItem.className = 'controls-menu-item';
+                offItem.onclick = () => setSubtitleTrack(null);
+                subsMenuItems.appendChild(offItem);
+
+                for (let i = 0; i < textTracks.length; i++) {
+                    const track = textTracks[i];
+                    if (track.kind === 'subtitles' || track.kind === 'captions') {
+                        const item = document.createElement('div');
+                        item.textContent = track.label;
+                        item.className = 'controls-menu-item';
+                        item.onclick = () => setSubtitleTrack(track.language);
+                        
+                        if (track.mode === 'showing') {
+                            item.classList.add('active');
+                            foundActive = true;
+                        }
+                        subsMenuItems.appendChild(item);
+                    }
+                }
+                
+                if (!foundActive) {
+                    offItem.classList.add('active');
+                }
+            }
+
+            // Populate Audio
+            if (audioTracks && audioTracks.length > 1) { // Only show if more than one track
+                audioBtn.classList.remove('hidden');
+                for (let i = 0; i < audioTracks.length; i++) {
+                    const track = audioTracks[i];
+                    const item = document.createElement('div');
+                    item.textContent = track.label || track.language;
+                    item.className = 'controls-menu-item';
+                    item.onclick = () => setAudioTrack(track.id);
+                    
+                    if (track.enabled) {
+                        item.classList.add('active');
+                    }
+                    audioMenuItems.appendChild(item);
+                }
+            }
+        }
+
+        function setSubtitleTrack(lang) {
+            for (let i = 0; i < video.textTracks.length; i++) {
+                const track = video.textTracks[i];
+                if (track.kind === 'subtitles' || track.kind === 'captions') {
+                    track.mode = (track.language === lang) ? 'showing' : 'disabled';
+                }
+            }
+            populateTrackMenus(); // Re-populate to show active state
+            subsMenu.style.display = 'none'; // Hide menu
+        }
+
+        function setAudioTrack(id) {
+            for (let i = 0; i < video.audioTracks.length; i++) {
+                video.audioTracks[i].enabled = (video.audioTracks[i].id === id);
+            }
+            populateTrackMenus(); // Re-populate
+            audioMenu.style.display = 'none'; // Hide menu
+        }
+        
+        subsBtn.addEventListener('click', () => {
+            audioMenu.style.display = 'none'; // Hide other menu
+            subsMenu.style.display = (subsMenu.style.display === 'block') ? 'none' : 'block';
+            showControls(); // Keep controls visible
+        });
+        
+        audioBtn.addEventListener('click', () => {
+            subsMenu.style.display = 'none'; // Hide other menu
+            audioMenu.style.display = (audioMenu.style.display === 'block') ? 'none' : 'block';
+            showControls(); // Keep controls visible
+        });
+        
+        // --- Watch History API Call ---
+        
+        function updateWatchHistory(time, sync = false) {
+            if (!config.isLoggedIn || !config.contentId) return;
+
+            const formData = new FormData();
+            formData.append('content_id', config.contentId);
+            formData.append('watch_time', Math.floor(time));
+
+            if (sync && navigator.sendBeacon) {
+                // Use sendBeacon for synchronous requests on page unload
+                // Note: sendBeacon sends POST data as blob, so PHP side needs adjustment
+                // For simplicity, we'll stick to async fetch, but beacon is more robust
+                // For now, we'll just use a standard fetch
+                 fetch('update_history.php', { method: 'POST', body: formData, keepalive: true });
+            } else if (!sync) {
+                // Regular async update
+                fetch('update_history.php', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if(data.success) {
+                        // console.log('History updated');
+                    } else {
+                        // console.error('Failed to update history:', data.error);
+                    }
+                })
+                .catch(error => {
+                    // console.error('Error updating history:', error);
+                });
+            }
+        }
+
     </script>
 
 </body>
