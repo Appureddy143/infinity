@@ -20,7 +20,7 @@ try {
 } catch (PDOException $e) {
     $content = []; // Start with an empty array on error
     // The error message will now be correct
-    $admin_error = "Error fetching content: " . $e->getMessage();
+    $admin_error = "Error fetching content: " {REDACTED}
 }
 
 ?>
@@ -95,13 +95,13 @@ try {
                     <!-- Poster Image URL -->
                     <div class="mb-4">
                         <label for="movie_poster_url" class="block text-sm font-medium text-gray-300">Poster Image URL</label>
-                        <input type="url" id="movie_poster_url" name="movie_poster_url" placeholder="https://..." class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required>
+                        <input type="url" id="movie_poster_url" name="movie_poster_url" placeholder="https: {REDACTED}
                     </div>
 
                     <!-- Video URL -->
                     <div class="mb-4">
                         <label for="movie_video_url" class="block text-sm font-medium text-gray-300">Video URL</label>
-                        <input type="url" id="movie_video_url" name="movie_video_url" placeholder="https://storage.com/..." class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required>
+                        <input type="url" id="movie_video_url" name="movie_video_url" placeholder="https: {REDACTED}
                     </div>
 
                     <!-- Genre -->
@@ -154,7 +154,7 @@ try {
                     <!-- Series Poster URL -->
                     <div class="mb-4">
                         <label for="series_poster_url" class="block text-sm font-medium text-gray-300">Poster Image URL</label>
-                        <input type="url" id="series_poster_url" name="series_poster_url" placeholder="https://..." class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required>
+                        <input type="url" id="series_poster_url" name="series_poster_url" placeholder="https: {REDACTED}
                     </div>
 
                     <!-- Series Genre -->
@@ -192,7 +192,7 @@ try {
                             </div>
                             <div class="col-span-2">
                                 <label for="merged_video_url" class="block text-sm font-medium text-gray-300">Video URL</to-label>
-                                <input type="url" id="merged_video_url" name="merged_video_url" placeholder="https://storage.com/..." class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white">
+                                <input type="url" id="merged_video_url" name="merged_video_url" placeholder="https: {REDACTED}
                             </div>
                             <div class="col-span-2">
                                 <label for="merged_language" class="block text-sm font-medium text-gray-300">Language</label>
@@ -242,7 +242,7 @@ try {
                                     </div>
                                     <div class="col-span-2">
                                         <label for="ep_video_url_1" class="block text-sm font-medium text-gray-300">Video URL</LAbel>
-                                        <input type="url" id="ep_video_url_1" name="ep_video_url[]" placeholder="https://storage.com/..." class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required>
+                                        <input type="url" id="ep_video_url_1" name="ep_video_url[]" placeholder="https: {REDACTED}
                                     </div>
                                     <div>
                                         <label for="ep_language_1" class="block text-sm font-medium text-gray-300">Language</LAbel>
@@ -282,9 +282,18 @@ try {
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Title</th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Type</th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Genre</th>
-                            <!-- FIX 1: Removed the "Added By" column header -->
                             <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="bg-gray-800 divide-y divide-gray-700">
-                        <?php if (e
+                        <!-- FIX 1: PHP 'if' statement now has the closing parenthesis -->
+                        <?php if (empty($content)): ?>
+                            <tr>
+                                <td colspan="4" class="px-6 py-4 whitespace-nowrap text-sm text-gray-400 text-center">No content found.</td>
+                            </tr>
+                        <?php else: ?>
+                            <?php foreach ($content as $item): ?>
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-white"><?= htmlspecialchars($item['title']) ?></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400"><?= htmlspecialchars($item['is_series'] ? 'Series' : 'Movie') ?></td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400"><?= htmlspecialchars($item['genre']) ?
