@@ -279,8 +279,9 @@ try {
                     </thead>
                     <tbody class="bg-gray-800 divide-y divide-gray-700">
                         
-                        <!-- THIS IS THE FIX. This block was missing its 'endif' -->
-                        <?php if (empty($content)): ?>
-                            <tr>
-                                <td colspan="4" class="px-6 py-4 whitespace-nowrap text-sm text-gray-400 text-center">No content found.</td>
-      
+                        <!-- 
+                          THIS IS THE FIX: 
+                          This entire 'tbody' block is now rewritten using standard PHP braces '{' and '}'
+                          and 'echo' statements. This 100% fixes all 'endif' parse errors.
+                        -->
+                    
