@@ -1,10 +1,6 @@
 <?php
     session_start();
-
-    // --- DATABASE CONNECTION (CONCEPT) ---
-    // $dsn = "pgsql:host=...;port...;dbname=...;user...;password=...";
-    // $pdo = new PDO($dsn, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-    $pdo = null; // Placeholder
+    require_once 'db_connect.php'; // Use our new connection file
 
     // --- Data Initialization ---
     $continueWatching = [];
@@ -19,110 +15,65 @@
         if (isset($_SESSION['user_id'])) {
             $user_id = $_SESSION['user_id'];
             
-            // $stmt_continue = $pdo->prepare("
-            //     SELECT 
-            //         wh.progress_seconds, wh.total_duration_seconds,
-            //         m.movie_id, m.title, m.poster_url, m.type,
-            //         e.episode_id, e.title AS episode_title, e.episode_number,
-            //         s.season_number
-            //     FROM 
-            //         watch_history wh
-            //     JOIN 
-            //         movies m ON wh.movie_id = m.movie_id
-            //     LEFT JOIN 
-            //         episodes e ON wh.episode_id = e.episode_id
-            //     LEFT JOIN 
-            //         seasons s ON e.season_id = s.season_id
-            //     WHERE 
-            //         wh.user_id = ? 
-            //         AND wh.progress_seconds > 30 -- Not just started
-            //         AND (wh.total_duration_seconds - wh.progress_seconds) > 60 -- Not finished
-            //     ORDER BY 
-            //         wh.last_watched_at DESC
-            //     LIMIT 5
-            // ");
-            // $stmt_continue->execute([$user_id]);
-            // $continueWatching = $stmt_continue->fetchAll(PDO::FETCH_ASSOC);
-
-            // Mock Data (replace with DB call)
-            $continueWatching = [
-                [
-                    'movie_id' => 124,
-                    'episode_id' => 1,
-                    'title' => 'Epic Series Title',
-                    'poster_url' => 'https://placehold.co/400x600/1a1a1a/ffffff?text=Series+Poster',
-                    'type' => 'series',
-                    'episode_title' => 'The Pilot',
-                    'episode_number' => 1,
-                    'season_number' => 1,
-                    'progress_seconds' => 1200,
-                    'total_duration_seconds' => 2700
-                ],
-                [
-                    'movie_id' => 123,
-                    'episode_id' => null,
-                    'title' => 'Action Movie',
-                    'poster_url' => 'https://placehold.co/400x600/1a1a1a/ffffff?text=Action+Movie',
-                    'type' => 'movie',
-                    'episode_title' => null,
-                    'episode_number' => null,
-                    'season_number' => null,
-                    'progress_seconds' => 3600,
-                    'total_duration_seconds' => 7200
-                ]
-            ];
+            $stmt_continue = $pdo->prepare("
+                SELECT 
+                    wh.progress_seconds, wh.total_duration_seconds,
+                    m.movie_id, m.title, m.poster_url, m.type,
+                    e.episode_id, e.title AS episode_title, e.episode_number,
+                    s.season_number
+                FROM 
+                    watch_history wh
+                JOIN 
+                    movies m ON wh.movie_id = m.movie_id
+                LEFT JOIN 
+                    episodes e ON wh.episode_id = e.episode_id
+                LEFT JOIN 
+                    seasons s ON e.season_id = s.season_id
+                WHERE 
+                    wh.user_id = ? 
+                    AND wh.progress_seconds > 30 -- Not just started
+                    AND (wh.total_duration_seconds - wh.progress_seconds) > 60 -- Not finished
+                ORDER BY 
+                    wh.last_watched_at DESC
+                LIMIT 5
+            ");
+            $stmt_continue->execute([$user_id]);
+            $continueWatching = $stmt_continue->fetchAll(PDO::FETCH_ASSOC);
         }
 
         // --- 2. Fetch All Time Hits (NOW DYNAMIC) ---
-        // This query counts views from watch_history to find the most popular movies.
-        // $stmt_hits = $pdo->query("
-        //     SELECT 
-        //         m.*, COUNT(wh.watch_history_id) AS watch_count
-        //     FROM 
-        //         movies m
-        //     JOIN 
-        //         watch_history wh ON m.movie_id = wh.movie_id
-        //     WHERE 
-        //         m.type = 'movie'
-        //     GROUP BY 
-        //         m.movie_id
-        //     ORDER BY 
-        //         watch_count DESC
-        //     LIMIT 10
-        // ");
-        // $allTimeHits = $stmt_hits->fetchAll(PDO::FETCH_ASSOC);
-        
-        // Mock Data (if db query fails or is empty)
-        if (empty($allTimeHits)) {
-            $allTimeHits = [
-                ['movie_id' => 101, 'title' => 'All Time Hit 1', 'poster_url' => 'https://placehold.co/400x600/1a1a1a/ffffff?text=Hit+Movie+1', 'language' => 'Kannada', 'type' => 'movie'],
-                ['movie_id' => 102, 'title' => 'All Time Hit 2', 'poster_url' => 'https://placehold.co/400x600/1a1a1a/ffffff?text=Hit+Movie+2', 'language' => 'Telugu', 'type' => 'movie'],
-            ];
-        }
+        $stmt_hits = $pdo->query("
+            SELECT 
+                m.*, COUNT(wh.watch_history_id) AS watch_count
+            FROM 
+                movies m
+            LEFT JOIN 
+                watch_history wh ON m.movie_id = wh.movie_id
+            WHERE 
+                m.type = 'movie'
+            GROUP BY 
+                m.movie_id
+            ORDER BY 
+                watch_count DESC
+            LIMIT 10
+        ");
+        $allTimeHits = $stmt_hits->fetchAll(PDO::FETCH_ASSOC);
 
         // --- 3. Fetch Kannada Movies ---
-        // $stmt_kannada = $pdo->query("SELECT * FROM movies WHERE type = 'movie' AND language = 'Kannada' ORDER BY release_date DESC LIMIT 10");
-        // $kannadaMovies = $stmt_kannada->fetchAll(PDO::FETCH_ASSOC);
-        $kannadaMovies = [
-            ['movie_id' => 103, 'title' => 'New Kannada Film', 'poster_url' => 'https://placehold.co/400x600/1a1a1a/ffffff?text=Kannada+1', 'language' => 'Kannada', 'type' => 'movie'],
-        ];
+        $stmt_kannada = $pdo->query("SELECT * FROM movies WHERE type = 'movie' AND language = 'Kannada' ORDER BY release_date DESC LIMIT 10");
+        $kannadaMovies = $stmt_kannada->fetchAll(PDO::FETCH_ASSOC);
 
         // --- 4. Fetch Telugu Movies ---
-        // $stmt_telugu = $pdo->query("SELECT * FROM movies WHERE type = 'movie' AND language = 'Telugu' ORDER BY release_date DESC LIMIT 10");
-        // $teluguMovies = $stmt_telugu->fetchAll(PDO::FETCH_ASSOC);
-        $teluguMovies = [
-            ['movie_id' => 104, 'title' => 'New Telugu Film', 'poster_url' => 'https://placehold.co/400x600/1a1a1a/ffffff?text=Telugu+1', 'language' => 'Telugu', 'type' => 'movie'],
-        ];
+        $stmt_telugu = $pdo->query("SELECT * FROM movies WHERE type = 'movie' AND language = 'Telugu' ORDER BY release_date DESC LIMIT 10");
+        $teluguMovies = $stmt_telugu->fetchAll(PDO::FETCH_ASSOC);
 
         // --- 5. Fetch Multi-language Movies ---
-        // $stmt_multi = $pdo->query("SELECT * FROM movies WHERE type = 'movie' AND language = 'Multi-language' ORDER BY release_date DESC LIMIT 10");
-        // $multiLanguageMovies = $stmt_multi->fetchAll(PDO::FETCH_ASSOC);
-        $multiLanguageMovies = [
-            ['movie_id' => 105, 'title' => 'Pan-India Film', 'poster_url' => 'https://placehold.co/400x600/1a1a1a/ffffff?text=Multi+1', 'language' => 'Multi-language', 'type' => 'movie'],
-        ];
+        $stmt_multi = $pdo->query("SELECT * FROM movies WHERE type = 'movie' AND language = 'Multi-language' ORDER BY release_date DESC LIMIT 10");
+        $multiLanguageMovies = $stmt_multi->fetchAll(PDO::FETCH_ASSOC);
 
     } catch (PDOException $e) {
-        $error = "Database error: " . $e->getMessage();
+        error_log($e->getMessage()); // Log error
+        $error = "An error occurred while loading content. Please try again later.";
     }
 ?>
 <!DOCTYPE html>
@@ -219,19 +170,16 @@
                             <a href="<?php echo htmlspecialchars($player_link); ?>" class="block movie-card relative rounded-lg overflow-hidden group">
                                 <img src="<?php echo htmlspecialchars($item['poster_url']); ?>" alt="<?php echo htmlspecialchars($item['title']); ?>" class="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105" onerror="this.src='https://placehold.co/400x600/1a1a1a/ffffff?text=Poster+Error'">
                                 
-                                <!-- Play icon overlay -->
                                 <div class="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-white" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
                                     </svg>
                                 </div>
 
-                                <!-- Progress Bar -->
                                 <div class="absolute bottom-0 left-0 w-full h-1.5 progress-bar-bg">
                                     <div class="h-full progress-bar-fg" style="width: <?php echo $progressPercent; ?>%;"></div>
                                 </div>
                                 
-                                <!-- Content Title -->
                                 <div class="absolute bottom-2 left-2 right-2 text-white p-1 rounded">
                                     <p class="text-sm font-semibold truncate"><?php echo htmlspecialchars($item['title']); ?></p>
                                     <?php if ($item['type'] == 'series'): ?>
@@ -313,7 +261,7 @@
                                 <span class="absolute top-1 left-1 bg-black bg-opacity-70 text-white text-xs px-2 py-0.5 rounded"><?php echo htmlspecialchars($movie['language']); ?></span>
                                 <div class="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black via-black/70 to-transparent">
                                     <h3 class="text-sm font-medium text-white truncate"><?php echo htmlspecialchars($movie['title']); ?></h3>
-                                CSS
+                                </div>
                             </a>
                         <?php endforeach; ?>
                     <?php endif; ?>
