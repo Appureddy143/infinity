@@ -1,36 +1,40 @@
 <?php
-/*
- * YourStream Central Database Connection
- *
- * This file connects to your Neon (PostgreSQL) database.
- * Enter your credentials from the Neon dashboard here.
- * All other PHP files will include this one file.
- */
+// FILE: db_connect.php
+// This file connects to your Neon database.
+// It uses Environment Variables set in Render for security.
 
-// --- Database Credentials from Neon ---
-$host = 'your-neon-host.db.elephantsql.com'; // Get this from Neon
-$db = 'your-database-name';             // Get this from Neon
-$user = 'your-username';                 // Get this from Neon
-$pass = 'your-password';                 // Get this from Neon
-$port = '5432';                        // Default for PostgreSQL
+// 1. Get database credentials from Render Environment Variables
+$host = getenv('DB_HOST');
+$port = getenv('DB_PORT');
+$db = getenv('DB_NAME');
+$user = getenv('DB_USER');
+$pass = getenv('DB_PASS');
 
-// This is the "DSN" or connection string
-$dsn = "pgsql:host=$host;port=$port;dbname=$db;user=$user;password=$pass";
+// 2. Create the DSN (Data Source Name) string
+//
+// **UPDATED**
+// We are adding "sslmode=require" to ensure a secure
+// connection, just as your Neon string requires.
+//
+$dsn = "pgsql:host=$host;port=$port;dbname=$db;user=$user;password=$pass;sslmode=require";
 
-// --- PDO Connection Options ---
+// 3. Set PDO options
 $options = [
     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION, // Throw exceptions on errors
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,       // Fetch as associative arrays
     PDO::ATTR_EMULATE_PREPARES   => false,                  // Use real prepared statements
 ];
 
+// 4. Try to connect
 try {
-    // Create the PDO database connection
-    $pdo = new PDO($dsn, $user, $pass, $options);
+     $pdo = new PDO($dsn, null, null, $options);
 } catch (PDOException $e) {
-    // Stop the script and show a generic error.
-    // In a real production app, you would log this error and show a user-friendly page.
-    error_log("Database Connection Error: " . $e->getMessage());
-    die("Could not connect to the database. Please try again later.");
+     // If connection fails, stop the script and show an error.
+     // In a real production app, you'd log this error instead.
+     die("Could not connect to the database: " . $e->getMessage());
 }
+
+// If we are here, the $pdo variable is now ready and
+// can be used by any file that 'includes' this one.
 ?>
+
