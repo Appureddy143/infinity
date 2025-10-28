@@ -1,40 +1,55 @@
 <?php
-// FILE: db_connect.php
-// This file connects to your Neon database.
-// It uses Environment Variables set in Render for security.
+// Turn on error reporting
+// error_reporting(E_ALL);
+// ini_set('display_errors', 1);
 
-// 1. Get database credentials from Render Environment Variables
+// Start the session on every page that includes this file
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Get database credentials from Render Environment Variables
 $host = getenv('DB_HOST');
 $port = getenv('DB_PORT');
-$db = getenv('DB_NAME');
+$dbname = getenv('DB_NAME');
 $user = getenv('DB_USER');
 $pass = getenv('DB_PASS');
 
-// 2. Create the DSN (Data Source Name) string
-//
-// **UPDATED**
-// We are adding "sslmode=require" to ensure a secure
-// connection, just as your Neon string requires.
-//
-$dsn = "pgsql:host=$host;port=$port;dbname=$db;user=$user;password=$pass;sslmode=require";
+// Create the DSN (Data Source Name) for PostgreSQL
+// We also include sslmode=require as Neon requires SSL.
+$dsn = "pgsql:host=$host;port=$port;dbname=$dbname;user=$user;password=$pass;sslmode=require";
 
-// 3. Set PDO options
 $options = [
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION, // Throw exceptions on errors
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,       // Fetch as associative arrays
-    PDO::ATTR_EMULATE_PREPARES   => false,                  // Use real prepared statements
+    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES   => false,
 ];
 
-// 4. Try to connect
 try {
      $pdo = new PDO($dsn, null, null, $options);
-} catch (PDOException $e) {
+} catch (\PDOException $e) {
      // If connection fails, stop the script and show an error.
-     // In a real production app, you'd log this error instead.
-     die("Could not connect to the database: " . $e->getMessage());
+     // In a real production app, you might show a friendlier error page.
+     // The (int) cast is a good security practice.
+     throw new \PDOException($e->getMessage(), (int)$e->getCode());
 }
 
-// If we are here, the $pdo variable is now ready and
-// can be used by any file that 'includes' this one.
-?>
+// Helper function to get logged-in user (can be null)
+function getLoggedInUser($pdo) {
+    if (isset($_SESSION['user_id'])) {
+        try {
+            $stmt = $pdo->prepare("SELECT * FROM users WHERE user_id = ?");
+            $stmt->execute([$_SESSION['user_id']]);
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            // Handle error, maybe log it
+            return null;
+        }
+    }
+    return null;
+}
 
+// Get the current user for all pages
+$currentUser = getLoggedInUser($pdo);
+// FIX: Removed all whitespace, blank lines, and comments after this closing tag.
+?>
