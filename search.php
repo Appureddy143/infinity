@@ -1,10 +1,6 @@
 <?php
     session_start();
-
-    // --- DATABASE CONNECTION (CONCEPT) ---
-    // $dsn = "pgsql:host=...;port...;dbname=...;user=...;password=...";
-    // $pdo = new PDO($dsn, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-    $pdo = null; // Placeholder
+    require_once 'db_connect.php'; // Use our new connection file
 
     // --- Data Initialization ---
     $search_query = "";
@@ -18,31 +14,27 @@
             $error = "Please enter a search term.";
         } else {
             try {
-                // --- Perform Search Query ---
-                // $like_query = "%" . $search_query . "%";
-                // $stmt = $pdo->prepare("
-                //     SELECT * FROM movies 
-                //     WHERE 
-                //         title ILIKE ? OR 
-                //         genre ILIKE ? OR 
-                //         description ILIKE ?
-                //     ORDER BY 
-                //         release_date DESC
-                //     LIMIT 50
-                // ");
-                // $stmt->execute([$like_query, $like_query, $like_query]);
-                // $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-                // Mock Data (replace with DB call)
-                if (stripos("Action Movie", $search_query) !== false) {
-                    $results[] = ['movie_id' => 123, 'title' => 'Action Movie', 'poster_url' => 'https://placehold.co/400x600/1a1a1a/ffffff?text=Action+Movie', 'language' => 'Multi-language', 'type' => 'movie'];
-                }
-                 if (stripos("Epic Series Title", $search_query) !== false) {
-                    $results[] = ['movie_id' => 124, 'title' => 'Epic Series Title', 'poster_url' => 'https://placehold.co/400x600/1a1a1a/ffffff?text=Series+Poster', 'language' => 'English', 'type' => 'series'];
-                }
+                // --- Perform REAL Search Query ---
+                // We use ILIKE for case-insensitive search in PostgreSQL
+                $like_query = "%" . $search_query . "%";
+                
+                $stmt = $pdo->prepare("
+                    SELECT * FROM movies 
+                    WHERE 
+                        title ILIKE ? OR 
+                        genre ILIKE ? OR 
+                        description ILIKE ?
+                    ORDER BY 
+                        release_date DESC
+                    LIMIT 50
+                ");
+                
+                $stmt->execute([$like_query, $like_query, $like_query]);
+                $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             } catch (PDOException $e) {
-                $error = "Database error: " . $e->getMessage();
+                error_log($e->getMessage()); // Log error
+                $error = "An error occurred during the search. Please try again.";
             }
         }
     } else {
@@ -131,3 +123,5 @@
 
 </body>
 </html>
+
+
