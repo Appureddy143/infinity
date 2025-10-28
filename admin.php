@@ -10,7 +10,7 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
 
 // Fetch existing content for the "Manage Content" section
 try {
-    // This query no longer references the non-existent 'added_by_user_id' column
+    // This query is fixed: It no longer references the non-existent 'added_by_user_id' column
     $stmt = $pdo->query("
         SELECT m.* FROM movies m 
         ORDER BY m.created_at DESC
@@ -18,7 +18,7 @@ try {
     $content = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     $content = []; // Start with an empty array on error
-    // FIX: Corrected the syntax error on this line
+    // This line is fixed: No more syntax errors
     $admin_error = "Error fetching content: " . $e->getMessage();
 }
 
@@ -33,14 +33,6 @@ try {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
-        /* Simple toggle switch CSS */
-        .toggle-checkbox:checked {
-            right: 0;
-            border-color: #EF4444;
-        }
-        .toggle-checkbox:checked + .toggle-label {
-            background-color: #EF4444;
-        }
     </style>
 </head>
 <body class="bg-gray-900 text-white">
@@ -56,6 +48,7 @@ try {
             </div>
         </header>
 
+        <!-- Error/Success Banners -->
         <?php if (isset($_GET['success'])): ?>
             <div class="bg-green-500 text-white p-3 rounded-md mb-6 text-center">
                 <?= htmlspecialchars($_GET['success']) ?>
@@ -285,6 +278,9 @@ try {
                         </tr>
                     </thead>
                     <tbody class="bg-gray-800 divide-y divide-gray-700">
+                        
+                        <!-- THIS IS THE FIX. This block was missing its 'endif' -->
                         <?php if (empty($content)): ?>
                             <tr>
-                                <td colspan="4" class="px-6 py-4 
+                                <td colspan="4" class="px-6 py-4 whitespace-nowrap text-sm text-gray-400 text-center">No content found.</td>
+      
