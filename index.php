@@ -1,231 +1,354 @@
 <?php
     session_start();
-    
+
     // --- DATABASE CONNECTION (CONCEPT) ---
-    // This is where you put your Neon connection string
-    // $dsn = "pgsql:host=...;port=...;dbname=...;user=...;password=...";
-    // try {
-    //     $pdo = new PDO($dsn);
-    // } catch (PDOException $e) {
-    //     die("DB Error: " . $e->getMessage());
-    // }
+    // $dsn = "pgsql:host=...;port...;dbname=...;user...;password=...";
+    // $pdo = new PDO($dsn, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    $pdo = null; // Placeholder
 
-    $isLoggedIn = isset($_SESSION['user_id']);
-    $userId = $_SESSION['user_id'] ?? null;
+    // --- Data Initialization ---
+    $continueWatching = [];
+    $allTimeHits = [];
+    $kannadaMovies = [];
+    $teluguMovies = [];
+    $multiLanguageMovies = [];
+    $error = null;
 
-    // --- DATA FETCHING (CONCEPT) ---
-    // In a real app, you would run these queries using $pdo
+    try {
+        // --- 1. Fetch Continue Watching (Logged-in users only) ---
+        if (isset($_SESSION['user_id'])) {
+            $user_id = $_SESSION['user_id'];
+            
+            // $stmt_continue = $pdo->prepare("
+            //     SELECT 
+            //         wh.progress_seconds, wh.total_duration_seconds,
+            //         m.movie_id, m.title, m.poster_url, m.type,
+            //         e.episode_id, e.title AS episode_title, e.episode_number,
+            //         s.season_number
+            //     FROM 
+            //         watch_history wh
+            //     JOIN 
+            //         movies m ON wh.movie_id = m.movie_id
+            //     LEFT JOIN 
+            //         episodes e ON wh.episode_id = e.episode_id
+            //     LEFT JOIN 
+            //         seasons s ON e.season_id = s.season_id
+            //     WHERE 
+            //         wh.user_id = ? 
+            //         AND wh.progress_seconds > 30 -- Not just started
+            //         AND (wh.total_duration_seconds - wh.progress_seconds) > 60 -- Not finished
+            //     ORDER BY 
+            //         wh.last_watched_at DESC
+            //     LIMIT 5
+            // ");
+            // $stmt_continue->execute([$user_id]);
+            // $continueWatching = $stmt_continue->fetchAll(PDO::FETCH_ASSOC);
 
-    // 1. Fetch Continue Watching (for logged-in user)
-    // $continueWatching = [];
-    // if ($isLoggedIn) {
-    //     $sql = "SELECT m.id, m.title, m.poster_url, m.type, h.watch_time, 
-    //                   CASE WHEN m.type = 'movie' THEN m.duration 
-    //                        ELSE (SELECT e.duration_seconds FROM episodes e WHERE e.id = h.content_id) 
-    //                   END as total_duration,
-    //                   CASE WHEN m.type = 'series' THEN (SELECT e.id FROM episodes e WHERE e.id = h.content_id) 
-    //                        ELSE m.id 
-    //                   END as content_play_id
-    //            FROM watch_history h
-    //            JOIN movies m ON m.id = (
-    //                 CASE WHEN (SELECT 1 FROM movies mov WHERE mov.id = h.content_id) THEN h.content_id 
-    //                      ELSE (SELECT s.movie_id FROM episodes e JOIN seasons s ON e.season_id = s.id WHERE e.id = h.content_id) 
-    //                 END
-    //            )
-    //            WHERE h.user_id = ? AND h.watch_time > 0 
-    //            ORDER BY h.last_watched DESC LIMIT 5";
-    //     // $stmt = $pdo->prepare($sql);
-    //     // $stmt->execute([$userId]);
-    //     // $continueWatching = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    // }
-    
-    // Placeholder data
-    $continueWatching = [
-        ['id' => 1, 'title' => 'Continue Movie', 'poster_url' => 'https://placehold.co/300x450/111/fff?text=Continue', 'type' => 'movie', 'watch_time' => 300, 'total_duration' => '2h 15m', 'content_play_id' => 1],
-        ['id' => 2, 'title' => 'Continue Series', 'poster_url' => 'https://placehold.co/300x450/222/fff?text=Continue', 'type' => 'series', 'watch_time' => 120, 'total_duration' => 1800, 'content_play_id' => 1] // content_play_id would be an episode ID
-    ];
+            // Mock Data (replace with DB call)
+            $continueWatching = [
+                [
+                    'movie_id' => 124,
+                    'episode_id' => 1,
+                    'title' => 'Epic Series Title',
+                    'poster_url' => 'https://placehold.co/400x600/1a1a1a/ffffff?text=Series+Poster',
+                    'type' => 'series',
+                    'episode_title' => 'The Pilot',
+                    'episode_number' => 1,
+                    'season_number' => 1,
+                    'progress_seconds' => 1200,
+                    'total_duration_seconds' => 2700
+                ],
+                [
+                    'movie_id' => 123,
+                    'episode_id' => null,
+                    'title' => 'Action Movie',
+                    'poster_url' => 'https://placehold.co/400x600/1a1a1a/ffffff?text=Action+Movie',
+                    'type' => 'movie',
+                    'episode_title' => null,
+                    'episode_number' => null,
+                    'season_number' => null,
+                    'progress_seconds' => 3600,
+                    'total_duration_seconds' => 7200
+                ]
+            ];
+        }
 
+        // --- 2. Fetch All Time Hits (NOW DYNAMIC) ---
+        // This query counts views from watch_history to find the most popular movies.
+        // $stmt_hits = $pdo->query("
+        //     SELECT 
+        //         m.*, COUNT(wh.watch_history_id) AS watch_count
+        //     FROM 
+        //         movies m
+        //     JOIN 
+        //         watch_history wh ON m.movie_id = wh.movie_id
+        //     WHERE 
+        //         m.type = 'movie'
+        //     GROUP BY 
+        //         m.movie_id
+        //     ORDER BY 
+        //         watch_count DESC
+        //     LIMIT 10
+        // ");
+        // $allTimeHits = $stmt_hits->fetchAll(PDO::FETCH_ASSOC);
+        
+        // Mock Data (if db query fails or is empty)
+        if (empty($allTimeHits)) {
+            $allTimeHits = [
+                ['movie_id' => 101, 'title' => 'All Time Hit 1', 'poster_url' => 'https://placehold.co/400x600/1a1a1a/ffffff?text=Hit+Movie+1', 'language' => 'Kannada', 'type' => 'movie'],
+                ['movie_id' => 102, 'title' => 'All Time Hit 2', 'poster_url' => 'https://placehold.co/400x600/1a1a1a/ffffff?text=Hit+Movie+2', 'language' => 'Telugu', 'type' => 'movie'],
+            ];
+        }
 
-    // 2. Fetch Featured
-    // $featured = $pdo->query("SELECT * FROM movies WHERE featured = true LIMIT 1")->fetch(PDO::FETCH_ASSOC);
-    $featured = ['id' => 10, 'title' => 'Featured Movie', 'description' => 'This is the most popular movie right now. Watch it!', 'poster_url' => 'https://placehold.co/600x400/f00/fff?text=FEATURED'];
+        // --- 3. Fetch Kannada Movies ---
+        // $stmt_kannada = $pdo->query("SELECT * FROM movies WHERE type = 'movie' AND language = 'Kannada' ORDER BY release_date DESC LIMIT 10");
+        // $kannadaMovies = $stmt_kannada->fetchAll(PDO::FETCH_ASSOC);
+        $kannadaMovies = [
+            ['movie_id' => 103, 'title' => 'New Kannada Film', 'poster_url' => 'https://placehold.co/400x600/1a1a1a/ffffff?text=Kannada+1', 'language' => 'Kannada', 'type' => 'movie'],
+        ];
 
-    // 3. Fetch All Time Hits
-    // $allTimeHits = $pdo->query("SELECT * FROM movies WHERE type = 'movie' ORDER BY popularity DESC LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
-    $allTimeHits = [
-        ['id' => 1, 'title' => 'Hit Movie 1', 'poster_url' => 'https://placehold.co/300x450/333/fff?text=Hit+1', 'language' => 'English', 'type' => 'movie'],
-        ['id' => 2, 'title' => 'Hit Movie 2', 'poster_url' => 'https://placehold.co/300x450/444/fff?text=Hit+2', 'language' => 'Hindi', 'type' => 'movie']
-    ];
+        // --- 4. Fetch Telugu Movies ---
+        // $stmt_telugu = $pdo->query("SELECT * FROM movies WHERE type = 'movie' AND language = 'Telugu' ORDER BY release_date DESC LIMIT 10");
+        // $teluguMovies = $stmt_telugu->fetchAll(PDO::FETCH_ASSOC);
+        $teluguMovies = [
+            ['movie_id' => 104, 'title' => 'New Telugu Film', 'poster_url' => 'https://placehold.co/400x600/1a1a1a/ffffff?text=Telugu+1', 'language' => 'Telugu', 'type' => 'movie'],
+        ];
 
-    // 4. Fetch by Language
-    // $kannadaMovies = $pdo->query("SELECT * FROM movies WHERE language = 'Kannada' LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
-    $kannadaMovies = [
-        ['id' => 3, 'title' => 'Kannada Movie 1', 'poster_url' => 'https://placehold.co/300x450/555/fff?text=KGF', 'language' => 'Kannada', 'type' => 'movie'],
-        ['id' => 4, 'title' => 'Kannada Series 1', 'poster_url' => 'https://placehold.co/300x450/666/fff?text=Series', 'language' => 'Kannada', 'type' => 'series']
-    ];
-    // $teluguMovies = $pdo->query("SELECT * FROM movies WHERE language = 'Telugu' LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
-    $teluguMovies = [
-        ['id' => 5, 'title' => 'Telugu Movie 1', 'poster_url' => 'https://placehold.co/300x450/777/fff?text=RRR', 'language' => 'Telugu', 'type' => 'movie']
-    ];
-    // $multiLanguage = $pdo->query("SELECT * FROM movies WHERE language = 'Multi' LIMIT 10")->fetchAll(PDO::FETCH_ASSOC);
-    $multiLanguage = [
-         ['id' => 6, 'title' => 'Multi Movie 1', 'poster_url' => 'https://placehold.co/300x450/888/fff?text=Multi', 'language' => 'Multi', 'type' => 'movie']
-    ];
+        // --- 5. Fetch Multi-language Movies ---
+        // $stmt_multi = $pdo->query("SELECT * FROM movies WHERE type = 'movie' AND language = 'Multi-language' ORDER BY release_date DESC LIMIT 10");
+        // $multiLanguageMovies = $stmt_multi->fetchAll(PDO::FETCH_ASSOC);
+        $multiLanguageMovies = [
+            ['movie_id' => 105, 'title' => 'Pan-India Film', 'poster_url' => 'https://placehold.co/400x600/1a1a1a/ffffff?text=Multi+1', 'language' => 'Multi-language', 'type' => 'movie'],
+        ];
 
+    } catch (PDOException $e) {
+        $error = "Database error: " . $e->getMessage();
+    }
 ?>
-
 <!DOCTYPE html>
-<html lang="en" class="bg-gray-900">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MyStream - Home</title>
+    <title>YourStream - Mobile Streaming</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        .snap-x { scroll-snap-type: x mandatory; }
-        .snap-center { scroll-snap-align: center; }
-        ::-webkit-scrollbar { display: none; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f0f0f;
+            color: #ffffff;
+        }
+        /* Hide scrollbar */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+        .movie-card {
+            flex: 0 0 140px; /* Do not grow, do not shrink, base width 140px */
+        }
+        .progress-bar-bg {
+            background-color: rgba(90, 90, 90, 0.7);
+        }
+        .progress-bar-fg {
+            background-color: #ef4444; /* red-500 */
+        }
     </style>
 </head>
-<body class="font-sans text-white">
+<body class="antialiased">
 
-    <!-- Header -->
-    <header class="p-4 flex justify-between items-center sticky top-0 bg-gray-900 z-10">
-        <h1 class="text-3xl font-bold text-red-600">MyStream</h1>
-        <div class="flex items-center space-x-4">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <?php if ($isLoggedIn): ?>
-                <a href="logout.php">
-                    <img src="https://placehold.co/40x40/f0f/fff?text=U" alt="User Profile" class="h-8 w-8 rounded-full">
-                </a>
-            <?php else: ?>
-                <a href="login.php" class="text-sm bg-red-600 px-3 py-1.5 rounded-md font-semibold">Login</a>
-            <?php endif; ?>
-        </div>
-    </header>
-
-    <!-- Main Content -->
-    <main class="pb-20">
-
-        <!-- Featured Movie -->
-        <?php if ($featured): ?>
-        <section class="w-full h-64 md:h-80 relative mb-6">
-            <img src="<?php echo htmlspecialchars($featured['poster_url']); ?>" alt="<?php echo htmlspecialchars($featured['title']); ?>" class="w-full h-full object-cover">
-            <div class="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent"></div>
-            <div class="absolute bottom-0 left-0 p-6">
-                <h2 class="text-2xl font-bold"><?php echo htmlspecialchars($featured['title']); ?></h2>
-                <p class="text-sm text-gray-300 mb-4"><?php echo htmlspecialchars($featured['description']); ?></p>
-                <a href="details.php?id=<?php echo $featured['id']; ?>" class="bg-white text-black font-bold py-2 px-6 rounded-lg hover:bg-gray-200 transition">
-                    Play
-                </a>
-            </div>
-        </section>
-        <?php endif; ?>
+    <div class="container mx-auto max-w-lg min-h-screen bg-black">
         
-        <!-- Continue Watching -->
-        <?php if (!empty($continueWatching)): ?>
-        <section class="mb-8">
-            <h2 class="text-2xl font-semibold px-4 mb-3">Continue Watching</h2>
-            <div class="flex overflow-x-auto snap-x gap-4 px-4">
-                <?php foreach ($continueWatching as $item): ?>
-                    <?php
-                        // Calculate progress
-                        $progress = 0;
-                        if (is_numeric($item['total_duration'])) { // Series (duration in seconds)
-                            $progress = ($item['watch_time'] / $item['total_duration']) * 100;
-                        } else { // Movie (duration as string "2h 15m")
-                            // Simple placeholder logic
-                            $progress = 50; 
-                        }
-                    ?>
-                    <div class="flex-shrink-0 w-48 snap-center">
-                        <div class="relative rounded-lg overflow-hidden group">
-                            <!-- Link to player with correct ID (movie or episode) -->
-                            <a href="player.php?<?php echo $item['type'] === 'movie' ? 'id=' : 'episode='; ?><?php echo $item['content_play_id']; ?>">
-                                <img src="<?php echo htmlspecialchars($item['poster_url']); ?>" alt="<?php echo htmlspecialchars($item['title']); ?>" class="w-full h-28 object-cover">
-                                <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" viewBox="0 0 20 20" fill="currentColor">
+        <!-- Header -->
+        <header class="p-4 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
+            <h1 class="text-2xl font-bold text-red-500">YourStream</h1>
+            <nav class="flex items-center space-x-4">
+                <?php if (isset($_SESSION['user_id'])): ?>
+                    <span class="text-gray-300 text-sm hidden sm:inline">Hi, <?php echo htmlspecialchars($_SESSION['username']); ?></span>
+                    <a href="logout.php" class="text-gray-300 hover:text-white text-sm">Logout</a>
+                <?php else: ?>
+                    <a href="login.php" class="text-gray-300 hover:text-white text-sm">Login</a>
+                <?php endif; ?>
+            </nav>
+        </header>
+
+        <!-- Search Bar -->
+        <div class="p-4 pt-0">
+            <form action="search.php" method="GET" class="relative">
+                <input type="search" name="q" placeholder="Search movies, series..." class="w-full bg-zinc-800 text-white placeholder-gray-400 rounded-lg py-2.5 px-4 focus:outline-none focus:ring-2 focus:ring-red-500" required>
+                <button type="submit" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+            </form>
+        </div>
+
+        <!-- Main Content -->
+        <main class="pb-6">
+            
+            <?php if ($error): ?>
+                <div class="text-center text-red-400 p-4"><?php echo htmlspecialchars($error); ?></div>
+            <?php endif; ?>
+
+            <!-- Continue Watching Section -->
+            <?php if (!empty($continueWatching)): ?>
+                <section class="mb-6">
+                    <h2 class="text-xl font-semibold px-4 mb-3">Continue Watching</h2>
+                    <div class="flex overflow-x-auto no-scrollbar px-4 space-x-4">
+                        
+                        <?php foreach ($continueWatching as $item): ?>
+                            <?php
+                                // Calculate progress
+                                $progressPercent = 0;
+                                if ($item['total_duration_seconds'] > 0) {
+                                    $progressPercent = ($item['progress_seconds'] / $item['total_duration_seconds']) * 100;
+                                }
+                                
+                                // Determine the correct link
+                                $player_link = "player.php?";
+                                if ($item['type'] == 'series' && $item['episode_id']) {
+                                    $player_link .= "episode_id=" . $item['episode_id'];
+                                } else {
+                                    $player_link .= "movie_id=" . $item['movie_id'];
+                                }
+                            ?>
+                            <a href="<?php echo htmlspecialchars($player_link); ?>" class="block movie-card relative rounded-lg overflow-hidden group">
+                                <img src="<?php echo htmlspecialchars($item['poster_url']); ?>" alt="<?php echo htmlspecialchars($item['title']); ?>" class="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105" onerror="this.src='https://placehold.co/400x600/1a1a1a/ffffff?text=Poster+Error'">
+                                
+                                <!-- Play icon overlay -->
+                                <div class="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-white" viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
                                     </svg>
                                 </div>
+
                                 <!-- Progress Bar -->
-                                <div class="absolute bottom-0 left-0 w-full h-1 bg-gray-700">
-                                    <div class="h-1 bg-red-600" style="width: <?php echo $progress; ?>%;"></div>
+                                <div class="absolute bottom-0 left-0 w-full h-1.5 progress-bar-bg">
+                                    <div class="h-full progress-bar-fg" style="width: <?php echo $progressPercent; ?>%;"></div>
+                                </div>
+                                
+                                <!-- Content Title -->
+                                <div class="absolute bottom-2 left-2 right-2 text-white p-1 rounded">
+                                    <p class="text-sm font-semibold truncate"><?php echo htmlspecialchars($item['title']); ?></p>
+                                    <?php if ($item['type'] == 'series'): ?>
+                                        <p class="text-xs text-gray-200 truncate">S<?php echo $item['season_number']; ?>:E<?php echo $item['episode_number']; ?> "<?php echo htmlspecialchars($item['episode_title']); ?>"</p>
+                                    <?php endif; ?>
                                 </div>
                             </a>
-                        </div>
-                        <h3 class="text-sm font-semibold mt-2 truncate"><?php echo htmlspecialchars($item['title']); ?></h3>
+                        <?php endforeach; ?>
+
                     </div>
-                <?php endforeach; ?>
-            </div>
-        </section>
-        <?php endif; ?>
+                </section>
+            <?php endif; ?>
 
-        <!-- Reusable Movie Card Function (Conceptual) -->
-        <?php
-        function renderMovieCard($movie) {
-            $link = ($movie['type'] === 'movie' ? 'details.php' : 'series.php') . '?id=' . $movie['id'];
-            echo '<div class="flex-shrink-0 w-36 sm:w-40 snap-center">';
-            echo '  <a href="' . $link . '" class="block group relative rounded-lg overflow-hidden">';
-            echo '    <img src="' . htmlspecialchars($movie['poster_url']) . '" alt="' . htmlspecialchars($movie['title']) . '" class="w-full h-52 sm:h-60 object-cover">';
-            echo '    <div class="absolute top-1 left-1 bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-sm">' . htmlspecialchars($movie['language']) . '</div>';
-            echo '    <div class="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition">';
-            echo '      <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>';
-            echo '    </div>';
-            echo '  </a>';
-            echo '  <h3 class="text-sm font-semibold mt-2 truncate">' . htmlspecialchars($movie['title']) . '</h3>';
-            echo '</div>';
-        }
-        ?>
 
-        <!-- All Time Hits -->
-        <section class="mb-8">
-            <h2 class="text-2xl font-semibold px-4 mb-3">All Time Hits</h2>
-            <div class="flex overflow-x-auto snap-x gap-4 px-4">
-                <?php foreach ($allTimeHits as $movie) { renderMovieCard($movie); } ?>
-            </div>
-        </section>
+            <!-- All Time Hits Section -->
+            <section class="mb-6">
+                <h2 class="text-xl font-semibold px-4 mb-3">All Time Hits</h2>
+                <div class="flex overflow-x-auto no-scrollbar px-4 space-x-4">
+                    
+                    <?php if (empty($allTimeHits)): ?>
+                        <p class="text-gray-500 pl-4">No movies available in this category.</p>
+                    <?php else: ?>
+                        <?php foreach ($allTimeHits as $movie): ?>
+                            <?php
+                                $details_link = ($movie['type'] ?? 'movie') == 'series' ? "series.php?id=" . $movie['movie_id'] : "details.php?id=" . $movie['movie_id'];
+                            ?>
+                            <a href="<?php echo htmlspecialchars($details_link); ?>" class="block movie-card relative rounded-lg overflow-hidden group">
+                                <img src="<?php echo htmlspecialchars($movie['poster_url']); ?>" alt="<?php echo htmlspecialchars($movie['title']); ?>" class="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105" onerror="this.src='https://placehold.co/400x600/1a1a1a/ffffff?text=Poster+Error'">
+                                <span class="absolute top-1 left-1 bg-black bg-opacity-70 text-white text-xs px-2 py-0.5 rounded"><?php echo htmlspecialchars($movie['language']); ?></span>
+                                <div class="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black via-black/70 to-transparent">
+                                    <h3 class="text-sm font-medium text-white truncate"><?php echo htmlspecialchars($movie['title']); ?></h3>
+                                </div>
+                            </a>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+
+                </div>
+            </section>
+            
+            <!-- Kannada Section -->
+            <section class="mb-6">
+                <h2 class="text-xl font-semibold px-4 mb-3">Kannada</h2>
+                <div class="flex overflow-x-auto no-scrollbar px-4 space-x-4">
+                    
+                    <?php if (empty($kannadaMovies)): ?>
+                        <p class="text-gray-500 pl-4">No movies available in this category.</p>
+                    <?php else: ?>
+                        <?php foreach ($kannadaMovies as $movie): ?>
+                             <?php
+                                $details_link = ($movie['type'] ?? 'movie') == 'series' ? "series.php?id=" . $movie['movie_id'] : "details.php?id=" . $movie['movie_id'];
+                            ?>
+                            <a href="<?php echo htmlspecialchars($details_link); ?>" class="block movie-card relative rounded-lg overflow-hidden group">
+                                <img src="<?php echo htmlspecialchars($movie['poster_url']); ?>" alt="<?php echo htmlspecialchars($movie['title']); ?>" class="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105" onerror="this.src='https://placehold.co/400x600/1a1a1a/ffffff?text=Poster+Error'">
+                                <span class="absolute top-1 left-1 bg-black bg-opacity-70 text-white text-xs px-2 py-0.5 rounded"><?php echo htmlspecialchars($movie['language']); ?></span>
+                                <div class="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black via-black/70 to-transparent">
+                                    <h3 class="text-sm font-medium text-white truncate"><?php echo htmlspecialchars($movie['title']); ?></h3>
+                                </div>
+                            </a>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+
+                </div>
+            </section>
+            
+            <!-- Telugu Section -->
+            <section class="mb-6">
+                <h2 class="text-xl font-semibold px-4 mb-3">Telugu</h2>
+                <div class="flex overflow-x-auto no-scrollbar px-4 space-x-4">
+                    
+                     <?php if (empty($teluguMovies)): ?>
+                        <p class="text-gray-500 pl-4">No movies available in this category.</p>
+                    <?php else: ?>
+                        <?php foreach ($teluguMovies as $movie): ?>
+                             <?php
+                                $details_link = ($movie['type'] ?? 'movie') == 'series' ? "series.php?id=" . $movie['movie_id'] : "details.php?id=" . $movie['movie_id'];
+                            ?>
+                            <a href="<?php echo htmlspecialchars($details_link); ?>" class="block movie-card relative rounded-lg overflow-hidden group">
+                                <img src="<?php echo htmlspecialchars($movie['poster_url']); ?>" alt="<?php echo htmlspecialchars($movie['title']); ?>" class="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105" onerror="this.src='https://placehold.co/400x600/1a1a1a/ffffff?text=Poster+Error'">
+                                <span class="absolute top-1 left-1 bg-black bg-opacity-70 text-white text-xs px-2 py-0.5 rounded"><?php echo htmlspecialchars($movie['language']); ?></span>
+                                <div class="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black via-black/70 to-transparent">
+                                    <h3 class="text-sm font-medium text-white truncate"><?php echo htmlspecialchars($movie['title']); ?></h3>
+                                CSS
+                            </a>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+
+                </div>
+            </section>
+            
+            <!-- Multi-language Section -->
+            <section class="mb-6">
+                <h2 class="text-xl font-semibold px-4 mb-3">Multi-language</h2>
+                <div class="flex overflow-x-auto no-scrollbar px-4 space-x-4">
+                    
+                     <?php if (empty($multiLanguageMovies)): ?>
+                        <p class="text-gray-500 pl-4">No movies available in this category.</p>
+                    <?php else: ?>
+                        <?php foreach ($multiLanguageMovies as $movie): ?>
+                             <?php
+                                $details_link = ($movie['type'] ?? 'movie') == 'series' ? "series.php?id=" . $movie['movie_id'] : "details.php?id=" . $movie['movie_id'];
+                            ?>
+                            <a href="<?php echo htmlspecialchars($details_link); ?>" class="block movie-card relative rounded-lg overflow-hidden group">
+                                <img src="<?php echo htmlspecialchars($movie['poster_url']); ?>" alt="<?php echo htmlspecialchars($movie['title']); ?>" class="w-full h-auto object-cover transition-transform duration-300 group-hover:scale-105" onerror="this.src='https://placehold.co/400x600/1a1a1a/ffffff?text=Poster+Error'">
+                                <span class="absolute top-1 left-1 bg-black bg-opacity-70 text-white text-xs px-2 py-0.5 rounded"><?php echo htmlspecialchars($movie['language']); ?></span>
+                                <div class="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black via-black/70 to-transparent">
+                                    <h3 class="text-sm font-medium text-white truncate"><?php echo htmlspecialchars($movie['title']); ?></h3>
+                                </div>
+                            </a>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+
+                </div>
+            </section>
+
+        </main>
         
-        <!-- Kannada -->
-        <section class="mb-8">
-            <h2 class="text-2xl font-semibold px-4 mb-3">Kannada</h2>
-            <div class="flex overflow-x-auto snap-x gap-4 px-4">
-                <?php foreach ($kannadaMovies as $movie) { renderMovieCard($movie); } ?>
-            </div>
-        </section>
-
-        <!-- Telugu -->
-        <section class="mb-8">
-            <h2 class="text-2xl font-semibold px-4 mb-3">Telugu</h2>
-            <div class="flex overflow-x-auto snap-x gap-4 px-4">
-                 <?php foreach ($teluguMovies as $movie) { renderMovieCard($movie); } ?>
-            </div>
-        </section>
-
-        <!-- Multi Language -->
-        <section class="mb-8">
-            <h2 class="text-2xl font-semibold px-4 mb-3">Multi-Language</h2>
-            <div class="flex overflow-x-auto snap-x gap-4 px-4">
-                <?php foreach ($multiLanguage as $movie) { renderMovieCard($movie); } ?>
-            </div>
-        </section>
-
-    </main>
-
-    <!-- Bottom Navigation -->
-    <nav class="fixed bottom-0 left-0 w-full bg-gray-900/80 backdrop-blur-sm border-t border-gray-700 p-4">
-        <div class="flex justify-around">
-            <a href="index.php" class="text-red-600 flex flex-col items-center">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
-                </svg>
-                <span class="text-xs">Home</span>
-            </a>
-            <!-- Other nav items would go here -->
-        </div>
-    </nav>
+    </div>
 
 </body>
 </html>
