@@ -1,0 +1,11 @@
+# Ignore local development files
+.DS_Store
+*.log
+*.tmp
+
+# Ignore dependencies (if you add them later)
+/vendor/
+composer.lock
+
+# Ignore local configs
+# (You are using environment variables, which is good!)
