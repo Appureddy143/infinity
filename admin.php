@@ -8,7 +8,11 @@
         exit;
     }
 
-    // 2. Fetch existing content to manage
+    // 2. Check for feedback messages from delete/update
+    $feedback = $_SESSION['admin_feedback'] ?? null;
+    unset($_SESSION['admin_feedback']); // Clear message after displaying
+
+    // 3. Fetch existing content to manage
     $content = [];
     try {
         $stmt = $pdo->query("SELECT movie_id, title, type, release_date FROM movies ORDER BY created_at DESC");
@@ -46,7 +50,7 @@
 <body class="antialiased">
 
     <!-- Admin Header -->
-    <header class="bg-black shadow-lg shadow-zinc-900/50">
+    <header class="bg-black shadow-lg shadow-zinc-900/50 sticky top-0 z-50">
         <div class="container mx-auto max-w-4xl p-4 flex justify-between items-center">
             <h1 class="text-2xl font-bold text-red-500">Admin Panel</h1>
             <div>
@@ -55,6 +59,16 @@
             </div>
         </div>
     </header>
+
+    <!-- Feedback Message -->
+    <?php if ($feedback): ?>
+        <div class="container mx-auto max-w-4xl p-4">
+            <div class="<?php echo $feedback['type'] == 'success' ? 'bg-green-900 border-green-700 text-green-100' : 'bg-red-900 border-red-700 text-red-100'; ?> px-4 py-3 rounded-lg relative" role="alert">
+                <strong class="font-bold"><?php echo $feedback['type'] == 'success' ? 'Success!' : 'Error!'; ?></strong>
+                <span class="block sm:inline"><?php echo htmlspecialchars($feedback['message']); ?></span>
+            </div>
+        </div>
+    <?php endif; ?>
 
     <main class="container mx-auto max-w-4xl p-4 grid grid-cols-1 md:grid-cols-2 gap-8">
         
@@ -176,7 +190,7 @@
                                         <option>Kannada</option>
                                         <option>Telugu</option>
                                     </select>
-                                </div>
+                                 </div>
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-300">Video URL</label>
@@ -238,9 +252,14 @@
                             <?php if ($item['type'] == 'movie'): ?>
                                 <a href="admin_edit_movie.php?movie_id=<?php echo $item['movie_id']; ?>" class="text-sm text-blue-400 hover:underline">Edit</a>
                             <?php else: ?>
-                                <span class="text-sm text-gray-500" title="Series edit coming soon">Edit</span>
+                                <!-- THIS IS THE UPDATED LINK -->
+                                <a href="admin_edit_series.php?movie_id=<?php echo $item['movie_id']; ?>" class="text-sm text-blue-400 hover:underline">Edit</a>
                             <?php endif; ?>
-                            <a href="admin_delete.php?movie_id=<?php echo $item['movie_id']; ?>" class="text-sm text-red-500 hover:underline" onclick="return confirmDelete()">Delete</a>
+                            
+                            <!-- We use a form for delete to make it slightly safer and easier to style -->
+                            <form action="admin_delete.php?movie_id=<?php echo $item['movie_id']; ?>" method="POST" onsubmit="return confirm('Are you sure you want to delete this item? This action is permanent and will delete all associated seasons and episodes.');">
+                                <button type="submit" class="text-sm text-red-500 hover:underline">Delete</button>
+                            </form>
                         </div>
                     </div>
                 <?php endforeach; ?>
@@ -294,34 +313,4 @@
                 <input type="url" name="ep_thumbnail_url[]" class="block w-full rounded-md p-2 text-sm" placeholder="Thumbnail URL (optional)">
                 <div class="grid grid-cols-2 gap-4">
                     <input type="number" name="ep_duration_minutes[]" class="block w-full rounded-md p-2 text-sm" placeholder="Duration (min)" required>
-                    <select name="ep_language[]" class="block w-full rounded-md p-2 text-sm">
-                        <option>English</option>
-                        <option>Kannada</option>
-                        <option>Telugu</option>
-                    </select>
-                </div>
-            `;
-            container.appendChild(newItem);
-        });
-
-        // Remove an episode
-        function removeEpisode(button) {
-            button.closest('.episode-item').remove();
-            // We don't need to re-number, the array index in PHP will handle it.
-        }
-
-        // Custom confirm
-        function confirmDelete() {
-            // A simple modal could be built here, but for now, we'll use the browser confirm.
-            // In a real iFrame, this might be blocked. A custom modal is the long-term solution.
-            return confirm("Are you sure you want to delete this item? This action is permanent and will delete all associated seasons and episodes.");
-        }
-
-        // Initialize form
-        toggleUploadType('episodic');
-    </script>
-
-</body>
-</html>
-
-
+                    <select name="ep_language[]" 
