@@ -31,8 +31,8 @@
                     seasons s ON e.season_id = s.season_id
                 WHERE 
                     wh.user_id = ? 
-                    AND wh.progress_seconds > 30 -- Not just started
-                    AND (wh.total_duration_seconds - wh.progress_seconds) > 60 -- Not finished
+                    AND wh.progress_seconds > 30 
+                    AND (wh.total_duration_seconds - wh.progress_seconds) > 60 
                 ORDER BY 
                     wh.last_watched_at DESC
                 LIMIT 5
@@ -41,7 +41,7 @@
             $continueWatching = $stmt_continue->fetchAll(PDO::FETCH_ASSOC);
         }
 
-        // --- 2. Fetch All Time Hits (NOW DYNAMIC) ---
+        // --- 2. Fetch All Time Hits ---
         $stmt_hits = $pdo->query("
             SELECT 
                 m.*, COUNT(wh.watch_history_id) AS watch_count
@@ -114,20 +114,17 @@
     <div class="container mx-auto max-w-lg min-h-screen bg-black">
         
         <!-- Header -->
-        <header class="p-4 flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0">
+        <header class="p-4 flex justify-between items-center sticky top-0 bg-black z-20 shadow-md shadow-black/20">
             <h1 class="text-2xl font-bold text-red-500">YourStream</h1>
-            <nav class="flex items-center space-x-4">
-                <?php if (isset($_SESSION['user_id'])): ?>
-                    <span class="text-gray-300 text-sm hidden sm:inline">Hi, <?php echo htmlspecialchars($_SESSION['username']); ?></span>
-                    <a href="logout.php" class="text-gray-300 hover:text-white text-sm">Logout</a>
-                <?php else: ?>
-                    <a href="login.php" class="text-gray-300 hover:text-white text-sm">Login</a>
-                <?php endif; ?>
-            </nav>
+            <button id="search-toggle-btn" class="text-gray-300 hover:text-white p-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+            </button>
         </header>
 
-        <!-- Search Bar -->
-        <div class="p-4 pt-0">
+        <!-- Search Bar (Toggled by JS) -->
+        <div id="search-bar-container" class="p-4 pt-0 bg-black hidden">
             <form action="search.php" method="GET" class="relative">
                 <input type="search" name="q" placeholder="Search movies, series..." class="w-full bg-zinc-800 text-white placeholder-gray-400 rounded-lg py-2.5 px-4 focus:outline-none focus:ring-2 focus:ring-red-500" required>
                 <button type="submit" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white">
@@ -139,7 +136,8 @@
         </div>
 
         <!-- Main Content -->
-        <main class="pb-6">
+        <!-- Add pb-24 for padding to clear the bottom nav -->
+        <main class="pb-24">
             
             <?php if ($error): ?>
                 <div class="text-center text-red-400 p-4"><?php echo htmlspecialchars($error); ?></div>
@@ -296,8 +294,50 @@
 
         </main>
         
+        <!-- Bottom Navigation -->
+        <nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-lg bg-zinc-900 border-t border-zinc-700 grid grid-cols-2 z-30">
+            <!-- Home Icon -->
+            <a href="index.php" class="flex flex-col items-center p-3 text-red-500"> <!-- Active state: text-red-500 -->
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                </svg>
+                <span class="text-xs font-medium">Home</span>
+            </a>
+            
+            <!-- Profile/Login Icon -->
+            <?php if (isset($_SESSION['user_id'])): ?>
+                <a href="logout.php" class="flex flex-col items-center p-3 text-gray-400 hover:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd" />
+                    </svg>
+                    <span class="text-xs truncate"><?php echo htmlspecialchars($_SESSION['username']); ?></span>
+                </a>
+            <?php else: ?>
+                <a href="login.php" class="flex flex-col items-center p-3 text-gray-400 hover:text-white">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    <span class="text-xs">Login</span>
+                </a>
+            <?php endif; ?>
+        </nav>
+
     </div>
 
-</body>
-</html>
+    <script>
+        // JavaScript to toggle the search bar
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchToggleBtn = document.getElementById('search-toggle-btn');
+            const searchBarContainer = document.getElementById('search-bar-container');
 
+            if (searchToggleBtn && searchBarContainer) {
+                searchToggleBtn.addEventListener('click', function() {
+                    searchBarContainer.classList.toggle('hidden');
+                    if (!searchBarContainer.classList.contains('hidden')) {
+                        // Optional: automatically focus the search input
+                        searchBarContainer.querySelector('input[type="search"]').focus();
+                    }
+                });
+            }
+        });
+    
