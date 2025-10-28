@@ -10,16 +10,16 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
 
 // Fetch existing content for the "Manage Content" section
 try {
-    // We join with users to show who added what, just as an example
+    // FIX 1: Removed the broken LEFT JOIN and u.email
+    // This query no longer references the non-existent 'added_by_user_id' column
     $stmt = $pdo->query("
-        SELECT m.*, u.email 
-        FROM movies m 
-        LEFT JOIN users u ON m.added_by_user_id = u.user_id 
+        SELECT m.* FROM movies m 
         ORDER BY m.created_at DESC
     ");
     $content = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
     $content = []; // Start with an empty array on error
+    // The error message will now be correct
     $admin_error = "Error fetching content: " . $e->getMessage();
 }
 
@@ -65,6 +65,11 @@ try {
         <?php if (isset($_GET['error'])): ?>
             <div class="bg-red-500 text-white p-3 rounded-md mb-6 text-center">
                 <?= htmlspecialchars($_GET['error']) ?>
+            </div>
+        <?php endif; ?>
+         <?php if (isset($admin_error)): ?>
+            <div class="bg-red-500 text-white p-3 rounded-md mb-6 text-center">
+                <?= htmlspecialchars($admin_error) ?>
             </div>
         <?php endif; ?>
 
@@ -195,7 +200,6 @@ try {
                                     <option value="English">English</option>
                                     <option value="Kannada">Kannada</option>
                                     <option value="Telugu">Telugu</option>
-                                    <!-- UPDATE: Added new options -->
                                     <option value="Hindi">Hindi</option>
                                     <option value="Multi-language">Multi-language</option>
                                 </select>
@@ -246,7 +250,6 @@ try {
                                             <option value="English">English</option>
                                             <option value="Kannada">Kannada</option>
                                             <option value="Telugu">Telugu</option>
-                                            <!-- UPDATE: Added new options -->
                                             <option value="Hindi">Hindi</option>
                                             <option value="Multi-language">Multi-language</option>
                                         </select>
@@ -272,12 +275,6 @@ try {
         <section class="bg-gray-800 p-6 rounded-lg shadow-lg mt-8">
             <h2 class="text-2xl font-semibold mb-6">Manage Content</h2>
             
-            <?php if (isset($admin_error)): ?>
-                <div class="bg-red-500 text-white p-3 rounded-md mb-6 text-center">
-                    <?= htmlspecialchars($admin_error) ?>
-                </div>
-            <?php endif; ?>
-
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-700">
                     <thead class="bg-gray-700">
@@ -285,5 +282,9 @@ try {
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Title</th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Type</th>
                             <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Genre</th>
-                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Added By</th>
-                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray
+                            <!-- FIX 1: Removed the "Added By" column header -->
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-gray-800 divide-y divide-gray-700">
+                        
