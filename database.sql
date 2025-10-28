@@ -62,3 +62,73 @@ CREATE TABLE watch_history (
 CREATE INDEX idx_movies_language ON movies(language);
 CREATE INDEX idx_movies_type ON movies(type);
 CREATE INDEX idx_watch_history_user ON watch_history(user_id);
+
+-- Your Neon PostgreSQL Database Schema
+-- This file defines the structure of your database.
+
+-- Table for user information
+CREATE TABLE users (
+    user_id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Main table for all media (movies and series)
+CREATE TABLE movies (
+    movie_id SERIAL PRIMARY KEY,
+    type VARCHAR(10) NOT NULL, -- 'movie' or 'series'
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    poster_url VARCHAR(255),
+    video_url VARCHAR(255),     -- Only for 'movie' type
+    language VARCHAR(50),      -- e.g., 'Kannada', 'Multi'
+    genre VARCHAR(100),        -- 'Action, Thriller'
+    duration VARCHAR(20),      -- Only for 'movie' type (e.g., '2h 15m')
+    release_date DATE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table for seasons (linked to a 'series' in the movies table)
+CREATE TABLE seasons (
+    season_id SERIAL PRIMARY KEY,
+    movie_id INT NOT NULL REFERENCES movies(movie_id) ON DELETE CASCADE,
+    season_number INT NOT NULL,
+    title VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table for individual episodes (linked to a season)
+-- UPDATED: Added 'language' column
+CREATE TABLE episodes (
+    episode_id SERIAL PRIMARY KEY,
+    season_id INT NOT NULL REFERENCES seasons(season_id) ON DELETE CASCADE,
+    episode_number INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    video_url VARCHAR(255) NOT NULL,
+    duration_seconds INT,      -- Stored in seconds for easy calculations
+    thumbnail_url VARCHAR(255),
+    language VARCHAR(50),      -- Language for this specific episode
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Table to track user watch history
+CREATE TABLE watch_history (
+    history_id SERIAL PRIMARY KEY,
+    user_id INT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    movie_id INT REFERENCES movies(movie_id) ON DELETE CASCADE,     -- For tracking movies
+    episode_id INT REFERENCES episodes(episode_id) ON DELETE CASCADE, -- For tracking episodes
+    watch_time_seconds INT NOT NULL,
+    last_watched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Ensure a user has only one history entry per item
+    UNIQUE(user_id, movie_id),
+    UNIQUE(user_id, episode_id)
+);
+
+-- Optional: Create indexes for faster queries
+CREATE INDEX idx_watch_history_user ON watch_history(user_id);
+CREATE INDEX idx_movies_language ON movies(language);
+CREATE INDEX idx_movies_type ON movies(type);
+
