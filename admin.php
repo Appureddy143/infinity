@@ -1,26 +1,27 @@
 <?php
-    session_start();
-    require_once 'db_connect.php';
+// This must be at the very top, before any HTML.
+require 'db_connect.php';
 
-    // 1. Check if user is an Admin
-    if (!isset($_SESSION['user_id']) || !$_SESSION['is_admin']) {
-        header("Location: login.php");
-        exit;
-    }
+// Security Check: Make sure user is an admin
+if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
+    header('Location: login.php?error=Access denied. Admins only.');
+    exit;
+}
 
-    // 2. Check for feedback messages from delete/update
-    $feedback = $_SESSION['admin_feedback'] ?? null;
-    unset($_SESSION['admin_feedback']); // Clear message after displaying
-
-    // 3. Fetch existing content to manage
-    $content = [];
-    try {
-        $stmt = $pdo->query("SELECT movie_id, title, type, release_date FROM movies ORDER BY created_at DESC");
-        $content = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (PDOException $e) {
-        error_log($e->getMessage());
-        $manage_error = "Could not fetch content list.";
-    }
+// Fetch existing content for the "Manage Content" section
+try {
+    // We join with users to show who added what, just as an example
+    $stmt = $pdo->query("
+        SELECT m.*, u.email 
+        FROM movies m 
+        LEFT JOIN users u ON m.added_by_user_id = u.user_id 
+        ORDER BY m.created_at DESC
+    ");
+    $content = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+    $content = []; // Start with an empty array on error
+    $admin_error = "Error fetching content: " . $e->getMessage();
+}
 
 ?>
 <!DOCTYPE html>
@@ -32,285 +33,257 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #0f0f0f; color: #ffffff; }
-        input, select, textarea {
-            background-color: #1f2937;
-            border: 1px solid #374151;
-            color: #ffffff;
+        body { font-family: 'Inter', sans-serif; }
+        /* Simple toggle switch CSS */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #EF4444;
         }
-        input:focus, select:focus, textarea:focus {
-            border-color: #ef4444;
-            ring: 1px;
-            ring-color: #ef4444;
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #EF4444;
         }
-        /* Style for the episode template */
-        #episode-template { display: none; }
     </style>
 </head>
-<body class="antialiased">
+<body class="bg-gray-900 text-white">
 
-    <!-- Admin Header -->
-    <header class="bg-black shadow-lg shadow-zinc-900/50 sticky top-0 z-50">
-        <div class="container mx-auto max-w-4xl p-4 flex justify-between items-center">
-            <h1 class="text-2xl font-bold text-red-500">Admin Panel</h1>
+    <div class="container mx-auto max-w-6xl p-4">
+
+        <header class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-bold text-red-500">Admin Panel</h1>
             <div>
-                <a href="index.php" class="text-sm text-gray-300 hover:text-red-500 mr-4">&larr; Back to Site</a>
-                <a href="logout.php" class="text-sm text-gray-300 hover:text-red-500">Log Out</a>
+                <span class="text-gray-400 mr-4">Welcome, <?= htmlspecialchars($currentUser['email'] ?? 'Admin') ?>!</span>
+                <a href="index.php" class="text-blue-400 hover:text-blue-300 mr-4">&larr; Back to Site</a>
+                <a href="logout.php" class="text-red-500 hover:text-red-400">Logout</a>
             </div>
-        </div>
-    </header>
+        </header>
 
-    <!-- Feedback Message -->
-    <?php if ($feedback): ?>
-        <div class="container mx-auto max-w-4xl p-4">
-            <div class="<?php echo $feedback['type'] == 'success' ? 'bg-green-900 border-green-700 text-green-100' : 'bg-red-900 border-red-700 text-red-100'; ?> px-4 py-3 rounded-lg relative" role="alert">
-                <strong class="font-bold"><?php echo $feedback['type'] == 'success' ? 'Success!' : 'Error!'; ?></strong>
-                <span class="block sm:inline"><?php echo htmlspecialchars($feedback['message']); ?></span>
+        <?php if (isset($_GET['success'])): ?>
+            <div class="bg-green-500 text-white p-3 rounded-md mb-6 text-center">
+                <?= htmlspecialchars($_GET['success']) ?>
             </div>
-        </div>
-    <?php endif; ?>
+        <?php endif; ?>
+        <?php if (isset($_GET['error'])): ?>
+            <div class="bg-red-500 text-white p-3 rounded-md mb-6 text-center">
+                <?= htmlspecialchars($_GET['error']) ?>
+            </div>
+        <?php endif; ?>
 
-    <main class="container mx-auto max-w-4xl p-4 grid grid-cols-1 md:grid-cols-2 gap-8">
-        
-        <!-- Column 1: Add Content Forms -->
-        <div class="space-y-8">
-            <!-- Add Movie Form -->
-            <section class="bg-black p-6 rounded-lg shadow-2xl">
-                <h2 class="text-xl font-semibold mb-4 border-b border-zinc-700 pb-2">Add New Movie</h2>
+        <!-- Grid for Admin Forms -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+
+            <!-- Section 1: Add New Movie -->
+            <section class="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <h2 class="text-2xl font-semibold mb-6">Add New Movie</h2>
                 <form action="admin_add_movie.php" method="POST">
-                    <div class="space-y-4">
-                        <div>
-                            <label for="title" class="block text-sm font-medium text-gray-300">Title</label>
-                            <input type="text" name="title" id="title" class="mt-1 block w-full rounded-md p-2" required>
-                        </div>
-                        <div>
-                            <label for="description" class="block text-sm font-medium text-gray-300">Description</label>
-                            <textarea name="description" id="description" rows="3" class="mt-1 block w-full rounded-md p-2"></textarea>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label for="release_date" class="block text-sm font-medium text-gray-300">Release Date</label>
-                                <input type="date" name="release_date" id="release_date" class="mt-1 block w-full rounded-md p-2">
-                            </div>
-                            <div>
-                                <label for="genre" class="block text-sm font-medium text-gray-300">Genre</label>
-                                <input type="text" name="genre" id="genre" class="mt-1 block w-full rounded-md p-2" placeholder="e.g., Action, Comedy">
-                            </div>
-                        </div>
-                         <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label for="duration_minutes" class="block text-sm font-medium text-gray-300">Duration (minutes)</label>
-                                <input type="number" name="duration_minutes" id="duration_minutes" class="mt-1 block w-full rounded-md p-2" required>
-                            </div>
-                            <div>
-                                <label for="language" class="block text-sm font-medium text-gray-300">Language</label>
-                                <select name="language" id="language" class="mt-1 block w-full rounded-md p-2">
-                                    <option>English</option>
-                                    <option>Kannada</option>
-                                    <option>Telugu</option>
-                                    <option>Multi-language</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div>
-                            <label for="poster_url" class="block text-sm font-medium text-gray-300">Poster URL</label>
-                            <input type="url" name="poster_url" id="poster_url" class="mt-1 block w-full rounded-md p-2" placeholder="httpsRead.co/...">
-                        </div>
-                        <div>
-                            <label for="video_url" class="block text-sm font-medium text-gray-300">Video URL</label>
-                            <input type="url" name="video_url" id="video_url" class="mt-1 block w-full rounded-md p-2" placeholder="http://.../movie.mp4">
-                        </div>
-                        <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-200">
-                            Add Movie
-                        </button>
+                    <!-- Movie Title -->
+                    <div class="mb-4">
+                        <label for="movie_title" class="block text-sm font-medium text-gray-300">Movie Title</label>
+                        <input type="text" id="movie_title" name="movie_title" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required>
                     </div>
+
+                    <!-- Description -->
+                    <div class="mb-4">
+                        <label for="movie_description" class="block text-sm font-medium text-gray-300">Description</label>
+                        <textarea id="movie_description" name="movie_description" rows="3" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required></textarea>
+                    </div>
+
+                    <!-- Poster Image URL -->
+                    <div class="mb-4">
+                        <label for="movie_poster_url" class="block text-sm font-medium text-gray-300">Poster Image URL</label>
+                        <input type="url" id="movie_poster_url" name="movie_poster_url" placeholder="https://..." class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required>
+                    </div>
+
+                    <!-- Video URL -->
+                    <div class="mb-4">
+                        <label for="movie_video_url" class="block text-sm font-medium text-gray-300">Video URL</label>
+                        <input type="url" id="movie_video_url" name="movie_video_url" placeholder="https://storage.com/..." class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required>
+                    </div>
+
+                    <!-- Genre -->
+                    <div class="mb-4">
+                        <label for="movie_genre" class="block text-sm font-medium text-gray-300">Genre</label>
+                        <input type="text" id="movie_genre" name="movie_genre" placeholder="Action, Comedy, Drama" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required>
+                    </div>
+
+                    <!-- Language -->
+                    <div class="mb-4">
+                        <label for="movie_language" class="block text-sm font-medium text-gray-300">Language</label>
+                        <select id="movie_language" name="movie_language" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required>
+                            <option value="English">English</option>
+                            <option value="Kannada">Kannada</option>
+                            <option value="Telugu">Telugu</option>
+                            <option value="Hindi">Hindi</option>
+                            <option value="Multi-language">Multi-language</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Duration -->
+                    <div class="mb-6">
+                        <label for="movie_duration" class="block text-sm font-medium text-gray-300">Duration (in minutes)</label>
+                        <input type="number" id="movie_duration" name="movie_duration" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-md transition duration-300">
+                        Add Movie
+                    </button>
                 </form>
             </section>
 
-            <!-- Add Series Form -->
-            <section class="bg-black p-6 rounded-lg shadow-2xl">
-                <h2 class="text-xl font-semibold mb-4 border-b border-zinc-700 pb-2">Add New Series</h2>
-                <form action="admin_add_series.php" method="POST">
-                    <!-- Series Details -->
-                    <div class="space-y-4">
-                        <div>
-                            <label for="series_title" class="block text-sm font-medium text-gray-300">Series Title</label>
-                            <input type="text" name="title" id="series_title" class="mt-1 block w-full rounded-md p-2" required>
+            <!-- Section 2: Add New Series -->
+            <section class="bg-gray-800 p-6 rounded-lg shadow-lg">
+                <h2 class="text-2xl font-semibold mb-6">Add New Series</h2>
+                <form action="admin_add_series.php" method="POST" id="series-form">
+                    <!-- Series Title -->
+                    <div class="mb-4">
+                        <label for="series_title" class="block text-sm font-medium text-gray-300">Series Title</label>
+                        <input type="text" id="series_title" name="series_title" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required>
+                    </div>
+
+                    <!-- Series Description -->
+                    <div class="mb-4">
+                        <label for="series_description" class="block text-sm font-medium text-gray-300">Description</label>
+                        <textarea id="series_description" name="series_description" rows="3" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required></textarea>
+                    </div>
+
+                    <!-- Series Poster URL -->
+                    <div class="mb-4">
+                        <label for="series_poster_url" class="block text-sm font-medium text-gray-300">Poster Image URL</label>
+                        <input type="url" id="series_poster_url" name="series_poster_url" placeholder="https://..." class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required>
+                    </div>
+
+                    <!-- Series Genre -->
+                    <div class="mb-6">
+                        <label for="series_genre" class="block text-sm font-medium text-gray-300">Genre</label>
+                        <input type="text" id="series_genre" name="series_genre" placeholder="Action, Comedy, Drama" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required>
+                    </div>
+
+                    <!-- Episode Type Toggle -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Episode Type</label>
+                        <div class="flex items-center space-x-4">
+                            <label class="flex items-center">
+                                <input type="radio" name="episode_type" value="episodic" class="form-radio text-red-500 bg-gray-700" checked>
+                                <span class="ml-2 text-white">Episodic</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="episode_type" value="merged" class="form-radio text-red-500 bg-gray-700">
+                                <span class="ml-2 text-white">Merged Season File</span>
+                            </label>
                         </div>
-                        <div>
-                            <label for="series_description" class="block text-sm font-medium text-gray-300">Series Description</label>
-                            <textarea name="description" id="series_description" rows="3" class="mt-1 block w-full rounded-md p-2"></textarea>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                             <div>
-                                <label for="series_release_date" class="block text-sm font-medium text-gray-300">Release Date</label>
-                                <input type="date" name="release_date" id="series_release_date" class="mt-1 block w-full rounded-md p-2">
+                    </div>
+
+                    <!-- Container for Merged File Fields -->
+                    <div id="merged-fields" class="hidden space-y-4 mb-6 p-4 bg-gray-900 rounded-lg">
+                        <h3 class="text-xl font-semibold">Merged Season Details</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="merged_season" class="block text-sm font-medium text-gray-300">Season Number</label>
+                                <input type="number" id="merged_season" name="merged_season" value="1" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white">
+                            </div>
+                            <div class="col-span-2">
+                                <label for="merged_title" class="block text-sm font-medium text-gray-300">Title (e.g., "Season 1")</label>
+                                <input type="text" id="merged_title" name="merged_title" value="Season 1" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white">
+                            </div>
+                            <div class="col-span-2">
+                                <label for="merged_video_url" class="block text-sm font-medium text-gray-300">Video URL</to-label>
+                                <input type="url" id="merged_video_url" name="merged_video_url" placeholder="https://storage.com/..." class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white">
+                            </div>
+                            <div class="col-span-2">
+                                <label for="merged_language" class="block text-sm font-medium text-gray-300">Language</label>
+                                <select id="merged_language" name="merged_language" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white">
+                                    <option value="English">English</option>
+                                    <option value="Kannada">Kannada</option>
+                                    <option value="Telugu">Telugu</option>
+                                    <!-- UPDATE: Added new options -->
+                                    <option value="Hindi">Hindi</option>
+                                    <option value="Multi-language">Multi-language</option>
+                                </select>
                             </div>
                             <div>
-                                <label for="series_genre" class="block text-sm font-medium text-gray-300">Genre</label>
-                                <input type="text" name="genre" id="series_genre" class="mt-1 block w-full rounded-md p-2" placeholder="e.g., Drama, Sci-Fi">
+                                <label for="merged_duration" class="block text-sm font-medium text-gray-300">Total Duration (minutes)</label>
+                                <input type="number" id="merged_duration" name="merged_duration" placeholder="120" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white">
                             </div>
                         </div>
-                        <div>
-                            <label for="series_poster_url" class="block text-sm font-medium text-gray-300">Series Poster URL</label>
-                            <input type="url" name="poster_url" id="series_poster_url" class="mt-1 block w-full rounded-md p-2" placeholder="httpsRead.co/...">
-                        </div>
-                        <div>
-                            <label for="season_title" class="block text-sm font-medium text-gray-300">Season Title</label>
-                            <input type="text" name="season_title" id="season_title" class="mt-1 block w-full rounded-md p-2" value="Season 1">
-                        </div>
-                        
-                        <!-- Upload Type -->
-                        <div class="pt-2">
-                             <label class="block text-sm font-medium text-gray-300">Upload Type</label>
-                             <div class="mt-2 flex gap-4">
-                                <label class="flex items-center">
-                                    <input type="radio" name="upload_type" value="episodic" class="form-radio text-red-500" checked onchange="toggleUploadType(this.value)">
-                                    <span class="ml-2 text-sm">Episodic</span>
-                                </label>
-                                <label class="flex items-center">
-                                    <input type="radio" name="upload_type" value="merged" class="form-radio text-red-500" onchange="toggleUploadType(this.value)">
-                                    <span class="ml-2 text-sm">Merged Season File</span>
-                                </label>
-                             </div>
-                        </div>
+                    </div>
 
-                        <!-- Merged Section (Hidden by default) -->
-                        <div id="merged-section" class="hidden space-y-4 pt-4 border-t border-zinc-700">
-                            <h3 class="text-md font-semibold">Merged Season File Details</h3>
-                             <div class="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-300">Duration (minutes)</label>
-                                    <input type="number" name="merged_duration_minutes" class="mt-1 block w-full rounded-md p-2">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-300">Language</label>
-                                    <select name="merged_language" class="mt-1 block w-full rounded-md p-2">
-                                        <option>English</option>
-                                        <option>Kannada</option>
-                                        <option>Telugu</option>
-                                    </select>
-                                 </div>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-300">Video URL</label>
-                                <input type="url" name="merged_video_url" class="mt-1 block w-full rounded-md p-2" placeholder="http://.../season1_merged.mp4">
-                            </div>
-                        </div>
-
-                        <!-- Episodic Section (Visible by default) -->
-                        <div id="episodic-section" class="space-y-4 pt-4 border-t border-zinc-700">
-                            <h3 class="text-md font-semibold">Episodes</h3>
-                            <div id="episodes-container">
-                                <!-- Episode 1 (Mandatory) -->
-                                <div class="episode-item space-y-3 p-3 border border-zinc-700 rounded-lg">
-                                    <div class="flex justify-between items-center">
-                                        <label class="block text-sm font-medium text-gray-300">Episode 1</label>
-                                    </div>
-                                    <input type="text" name="ep_title[]" class="block w-full rounded-md p-2 text-sm" placeholder="Episode 1 Title" required>
-                                    <input type="url" name="ep_video_url[]" class="block w-full rounded-md p-2 text-sm" placeholder="Video URL" required>
-                                    <input type="url" name="ep_thumbnail_url[]" class="block w-full rounded-md p-2 text-sm" placeholder="Thumbnail URL (optional)">
-                                    <div class="grid grid-cols-2 gap-4">
-                                        <input type="number" name="ep_duration_minutes[]" class="block w-full rounded-md p-2 text-sm" placeholder="Duration (min)" required>
-                                        <select name="ep_language[]" class="block w-full rounded-md p-2 text-sm">
-                                            <option>English</option>
-                                            <option>Kannada</option>
-                                            <option>Telugu</option>
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                            <button type="button" id="add-episode-btn" class="mt-2 text-sm text-red-500 hover:text-red-400 font-medium">
-                                + Add Another Episode
+                    <!-- Container for Episodic Fields -->
+                    <div id="episodic-fields" class="space-y-4 mb-6">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-xl font-semibold">Episodes</h3>
+                            <button type="button" id="add-episode-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition duration-300">
+                                Add Another Episode
                             </button>
                         </div>
                         
-                        <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition-colors duration-200">
-                            Add Series
-                        </button>
+                        <!-- Season 1 (default) -->
+                        <div class="mb-4">
+                            <label for="season_number_1" class="block text-sm font-medium text-gray-300">Season Number</label>
+                            <input type="number" id="season_number_1" name="season_number" value="1" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required>
+                        </div>
+
+                        <!-- Episode container -->
+                        <div id="episodes-container" class="space-y-4">
+                            <!-- Episode 1 (Mandatory) -->
+                            <div class="p-4 bg-gray-900 rounded-lg episode-entry" data-episode-num="1">
+                                <h4 class="text-lg font-semibold text-white mb-3">Episode <span class="episode-number">1</span></h4>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label for="ep_title_1" class="block text-sm font-medium text-gray-300">Episode Title</label>
+                                        <input type="text" id="ep_title_1" name="ep_title[]" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required>
+                                    </div>
+                                    <div>
+                                        <label for="ep_number_1" class="block text-sm font-medium text-gray-300">Episode Number</LAbel>
+                                        <input type="number" id="ep_number_1" name="ep_number[]" value="1" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required>
+                                    </div>
+                                    <div class="col-span-2">
+                                        <label for="ep_video_url_1" class="block text-sm font-medium text-gray-300">Video URL</LAbel>
+                                        <input type="url" id="ep_video_url_1" name="ep_video_url[]" placeholder="https://storage.com/..." class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required>
+                                    </div>
+                                    <div>
+                                        <label for="ep_language_1" class="block text-sm font-medium text-gray-300">Language</LAbel>
+                                        <select id="ep_language_1" name="ep_language[]" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white ep-language-select">
+                                            <option value="English">English</option>
+                                            <option value="Kannada">Kannada</option>
+                                            <option value="Telugu">Telugu</option>
+                                            <!-- UPDATE: Added new options -->
+                                            <option value="Hindi">Hindi</option>
+                                            <option value="Multi-language">Multi-language</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="ep_duration_1" class="block text-sm font-medium text-gray-300">Duration (minutes)</LAbel>
+                                        <input type="number" id="ep_duration_1" name="ep_duration[]" placeholder="45" class="mt-1 block w-full bg-gray-700 border-gray-600 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-red-500 focus:border-red-500 text-white" required>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" class="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-md transition duration-300">
+                        Add Series
+                    </button>
                 </form>
             </section>
         </div>
 
-        <!-- Column 2: Manage Content -->
-        <section class="bg-black p-6 rounded-lg shadow-2xl">
-            <h2 class="text-xl font-semibold mb-4 border-b border-zinc-700 pb-2">Manage Content</h2>
-            <?php if (isset($manage_error)): ?>
-                <p class="text-red-400"><?php echo htmlspecialchars($manage_error); ?></p>
-            <?php endif; ?>
-            <div class="space-y-3 max-h-[1000px] overflow-y-auto">
-                <?php foreach ($content as $item): ?>
-                    <div class="flex items-center justify-between bg-zinc-900 p-3 rounded-lg">
-                        <div class="flex-1 overflow-hidden">
-                            <h3 class="font-semibold truncate"><?php echo htmlspecialchars($item['title']); ?></h3>
-                            <p class="text-sm text-gray-400 capitalize">
-                                <?php echo htmlspecialchars($item['type']); ?> &bull; <?php echo date('Y', strtotime($item['release_date'])); ?>
-                            </p>
-                        </div>
-                        <div class="flex-shrink-0 flex gap-3 ml-4">
-                            <?php if ($item['type'] == 'movie'): ?>
-                                <a href="admin_edit_movie.php?movie_id=<?php echo $item['movie_id']; ?>" class="text-sm text-blue-400 hover:underline">Edit</a>
-                            <?php else: ?>
-                                <!-- THIS IS THE UPDATED LINK -->
-                                <a href="admin_edit_series.php?movie_id=<?php echo $item['movie_id']; ?>" class="text-sm text-blue-400 hover:underline">Edit</a>
-                            <?php endif; ?>
-                            
-                            <!-- We use a form for delete to make it slightly safer and easier to style -->
-                            <form action="admin_delete.php?movie_id=<?php echo $item['movie_id']; ?>" method="POST" onsubmit="return confirm('Are you sure you want to delete this item? This action is permanent and will delete all associated seasons and episodes.');">
-                                <button type="submit" class="text-sm text-red-500 hover:underline">Delete</button>
-                            </form>
-                        </div>
-                    </div>
-                <?php endforeach; ?>
-                <?php if (empty($content)): ?>
-                    <p class="text-gray-500">No content added yet.</p>
-                <?php endif; ?>
-            </div>
-        </section>
-
-    </main>
-
-    <!-- JS for dynamic forms -->
-    <script>
-        // Toggle between Episodic and Merged
-        function toggleUploadType(type) {
-            if (type === 'merged') {
-                document.getElementById('merged-section').style.display = 'block';
-                document.getElementById('episodic-section').style.display = 'none';
-                // Remove 'required' from episodic inputs
-                document.querySelectorAll('#episodic-section input[required]').forEach(el => el.required = false);
-                // Add 'required' to merged inputs
-                document.querySelector('input[name="merged_video_url"]').required = true;
-                document.querySelector('input[name="merged_duration_minutes"]').required = true;
-            } else {
-                document.getElementById('merged-section').style.display = 'none';
-                document.getElementById('episodic-section').style.display = 'block';
-                // Add 'required' back to episodic inputs
-                document.querySelectorAll('#episodic-section input[placeholder*="Title"]').forEach(el => el.required = true);
-                document.querySelectorAll('#episodic-section input[placeholder*="Video URL"]').forEach(el => el.required = true);
-                document.querySelectorAll('#episodic-section input[placeholder*="Duration"]').forEach(el => el.required = true);
-                // Remove 'required' from merged inputs
-                document.querySelector('input[name="merged_video_url"]').required = false;
-                document.querySelector('input[name="merged_duration_minutes"]').required = false;
-            }
-        }
-        
-        // Add new episode fields
-        let episodeCount = 1;
-        document.getElementById('add-episode-btn').addEventListener('click', () => {
-            episodeCount++;
-            const container = document.getElementById('episodes-container');
-            const newItem = document.createElement('div');
-            newItem.className = 'episode-item space-y-3 p-3 border border-zinc-700 rounded-lg mt-3';
-            newItem.innerHTML = `
-                <div class="flex justify-between items-center">
-                    <label class="block text-sm font-medium text-gray-300">Episode ${episodeCount}</label>
-                    <button type="button" class="text-xs text-red-500 hover:underline" onclick="removeEpisode(this)">Remove</button>
+        <!-- Section 3: Manage Content -->
+        <section class="bg-gray-800 p-6 rounded-lg shadow-lg mt-8">
+            <h2 class="text-2xl font-semibold mb-6">Manage Content</h2>
+            
+            <?php if (isset($admin_error)): ?>
+                <div class="bg-red-500 text-white p-3 rounded-md mb-6 text-center">
+                    <?= htmlspecialchars($admin_error) ?>
                 </div>
-                <input type="text" name="ep_title[]" class="block w-full rounded-md p-2 text-sm" placeholder="Episode ${episodeCount} Title" required>
-                <input type="url" name="ep_video_url[]" class="block w-full rounded-md p-2 text-sm" placeholder="Video URL" required>
-                <input type="url" name="ep_thumbnail_url[]" class="block w-full rounded-md p-2 text-sm" placeholder="Thumbnail URL (optional)">
-                <div class="grid grid-cols-2 gap-4">
-                    <input type="number" name="ep_duration_minutes[]" class="block w-full rounded-md p-2 text-sm" placeholder="Duration (min)" required>
-                    <select name="ep_language[]" 
+            <?php endif; ?>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-700">
+                    <thead class="bg-gray-700">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Title</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Type</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Genre</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Added By</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray
