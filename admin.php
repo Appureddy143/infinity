@@ -10,7 +10,7 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
 
 // Fetch existing content for the "Manage Content" section
 try {
-    // FIX 1: Removed the broken LEFT JOIN and u.email
+    // FIX 1: Removed the broken LEFT JOIN.
     // This query no longer references the non-existent 'added_by_user_id' column
     $stmt = $pdo->query("
         SELECT m.* FROM movies m 
@@ -287,4 +287,4 @@ try {
                         </tr>
                     </thead>
                     <tbody class="bg-gray-800 divide-y divide-gray-700">
-                        
+                        <?php if (e
