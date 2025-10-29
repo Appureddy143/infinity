@@ -36,5 +36,9 @@ try {
     // This will stop the script and show a user-friendly error
     die("Could not connect to the database: " . $e->getMessage());
 }
-?>
+
+// --- THIS IS THE FIX ---
+// The closing "?>" tag has been removed.
+// This prevents any whitespace/blank lines at the end of the file
+// from causing "headers already sent" errors.
 
