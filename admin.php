@@ -10,8 +10,14 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
 
 // Fetch existing content for the "Manage Content" section
 try {
+    //
+    // --- THIS QUERY IS NOW FIXED ---
+    // Instead of "SELECT m.*", we list the columns explicitly.
+    // This fixes the "cached plan" error.
+    //
     $stmt = $pdo->query("
-        SELECT m.* FROM movies m 
+        SELECT m.movie_id, m.title, m.is_series, m.genre, m.created_at 
+        FROM movies m 
         ORDER BY m.created_at DESC
     ");
     $content = $stmt->fetchAll(PDO::FETCH_ASSOC);
