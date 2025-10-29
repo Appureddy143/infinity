@@ -45,8 +45,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $ep_language = $_POST['merged_language'] ?? null;
             $duration_minutes = $_POST['merged_duration'] ?? null;
 
-            if (empty($season_number) || empty($ep_title) || empty($ep_video_url) || empty($duration_minutes)) {
-                throw new Exception("All merged season fields (season, title, URL, duration) are required.");
+            if (empty($season_number) || empty($ep_title) || empty($ep_video_url) || empty($duration_minutes) || empty($ep_language)) {
+                throw new Exception("All merged season fields (season, title, URL, language, duration) are required.");
             }
             $duration_seconds = $duration_minutes * 60;
 
@@ -90,8 +90,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             
             for ($i = 0; $i < count($ep_titles); $i++) {
                 // Validate each episode's fields
-                if (empty($ep_titles[$i]) || empty($ep_numbers[$i]) || empty($ep_video_urls[$i]) || empty($ep_durations[$i])) {
-                    throw new Exception("All fields for Episode " . ($i+1) . " are required.");
+                if (empty($ep_titles[$i]) || empty($ep_numbers[$i]) || empty($ep_video_urls[$i]) || empty($ep_durations[$i]) || empty($ep_languages[$i])) {
+                    throw new Exception("All fields (title, #, URL, language, duration) for Episode " . ($i+1) . " are required.");
                 }
                 $duration_seconds = $ep_durations[$i] * 60;
                 $stmt->execute([
@@ -113,7 +113,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     } catch (Exception $e) {
         // If anything failed, roll back all changes
-        $pdo->rollBack();
+        // Check if the transaction is still active before rolling back
+        if ($pdo->inTransaction()) {
+            $pdo->rollBack();
+        }
         header('Location: admin.php?error=Failed to add series: ' . urlencode($e->getMessage()));
         exit;
     }
