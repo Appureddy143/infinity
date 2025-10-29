@@ -10,14 +10,10 @@ if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
 
 // Fetch existing content for the "Manage Content" section
 try {
-    //
-    // --- THIS QUERY IS NOW FIXED ---
-    // Instead of "SELECT m.*", we list the columns explicitly.
-    // This fixes the "cached plan" error.
-    //
+    // Query to fetch content (using explicit columns to avoid any cached plan issues)
     $stmt = $pdo->query("
-        SELECT m.movie_id, m.title, m.is_series, m.genre, m.created_at 
-        FROM movies m 
+        SELECT m.movie_id, m.title, m.is_series, m.genre, m.created_at
+        FROM movies m
         ORDER BY m.created_at DESC
     ");
     $content = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -25,8 +21,8 @@ try {
     $content = []; // Start with an empty array on error
     $admin_error = "Error fetching content: " . $e->getMessage();
 }
-
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -40,9 +36,7 @@ try {
     </style>
 </head>
 <body class="bg-gray-900 text-white">
-
     <div class="container mx-auto max-w-6xl p-4">
-
         <header class="flex flex-wrap justify-between items-center mb-8 gap-4">
             <h1 class="text-3xl font-bold text-red-500">Admin Panel</h1>
             <div>
@@ -63,7 +57,7 @@ try {
                 <?= htmlspecialchars($_GET['error']) ?>
             </div>
         <?php endif; ?>
-         <?php if (isset($admin_error)): ?>
+        <?php if (isset($admin_error)): ?>
             <div class="bg-red-500 text-white p-3 rounded-md mb-6 text-center">
                 <?= htmlspecialchars($admin_error) ?>
             </div>
@@ -82,7 +76,6 @@ try {
         <!-- Manage Content Table -->
         <section class="bg-gray-800 p-6 rounded-lg shadow-lg mt-8">
             <h2 class="text-2xl font-semibold mb-6">Manage Content</h2>
-            
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-700">
                     <thead class="bg-gray-700">
@@ -94,36 +87,37 @@ try {
                         </tr>
                     </thead>
                     <tbody class="bg-gray-800 divide-y divide-gray-700">
-                        <?php 
-                        if (empty($content)) {
-                            echo '<tr><td colspan="4" class="px-6 py-4 whitespace-nowrap text-sm text-gray-400 text-center">No content found.</td></tr>';
-                        } else {
-                            foreach ($content as $item) {
-                                echo '<tr>';
-                                echo '<td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">' . htmlspecialchars($item['title']) . '</td>';
-                                echo '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">' . htmlspecialchars($item['is_series'] ? 'Series' : 'Movie') . '</td>';
-                                echo '<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">' . htmlspecialchars($item['genre']) . '</td>';
-                                echo '<td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">';
-                                
-                                if ($item['is_series']) {
-                                    echo '<a href="admin_edit_series.php?id=' . $item['movie_id'] . '" class="text-blue-400 hover:text-blue-300 mr-3">Edit</a>';
-                                } else {
-                                    echo '<a href="admin_edit_movie.php?id=' . $item['movie_id'] . '" class="text-blue-400 hover:text-blue-300 mr-3">Edit</a>';
-                                }
-                                
-                                echo '<a href="admin_delete.php?id=' . $item['movie_id'] . '" class="text-red-400 hover:text-red-300" onclick="return confirm(\'Are you sure you want to delete this? This action cannot be undone.\')">Delete</a>';
-                                echo '</td>';
-                                echo '</tr>';
-                            }
-                        }
-                        ?>
+                        <?php if (empty($content)) { ?>
+                            <tr>
+                                <td colspan="4" class="px-6 py-4 whitespace-nowrap text-sm text-gray-400 text-center">No content found.</td>
+                            </tr>
+                        <?php } else { ?>
+                            <?php foreach ($content as $item) { ?>
+                                <tr>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
+                                        <?= htmlspecialchars($item['title']) ?>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                                        <?= htmlspecialchars($item['is_series'] ? 'Series' : 'Movie') ?>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                                        <?= htmlspecialchars($item['genre']) ?>
+                                    </td>
+                                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        <?php if ($item['is_series']) { ?>
+                                            <a href="admin_edit_series.php?id=<?= $item['movie_id'] ?>" class="text-blue-400 hover:text-blue-300 mr-3">Edit</a>
+                                        <?php } else { ?>
+                                            <a href="admin_edit_movie.php?id=<?= $item['movie_id'] ?>" class="text-blue-400 hover:text-blue-300 mr-3">Edit</a>
+                                        <?php } ?>
+                                        <a href="admin_delete.php?id=<?= $item['movie_id'] ?>" class="text-red-400 hover:text-red-300" onclick="return confirm('Are you sure you want to delete this? This action cannot be undone.')">Delete</a>
+                                    </td>
+                                </tr>
+                            <?php } ?>
+                        <?php } ?>
                     </tbody>
                 </table>
             </div>
         </section>
-
     </div>
 </body>
 </html>
-
-
