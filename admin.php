@@ -37,7 +37,7 @@ try {
 
     <div class="container mx-auto max-w-6xl p-4">
 
-        <header class="flex justify-between items-center mb-8">
+        <header class="flex flex-wrap justify-between items-center mb-8 gap-4">
             <h1 class="text-3xl font-bold text-red-500">Admin Panel</h1>
             <div>
                 <span class="text-gray-400 mr-4">Welcome, <?= htmlspecialchars($currentUser['email'] ?? 'Admin') ?>!</span>
@@ -63,7 +63,7 @@ try {
             </div>
         <?php endif; ?>
 
-        <!-- NEW: Add Content Buttons -->
+        <!-- Add Content Buttons -->
         <section class="mb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
             <a href="admin_add_movie.php" class="bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-6 rounded-lg text-center text-xl transition duration-300">
                 + Add New Movie
@@ -73,7 +73,7 @@ try {
             </a>
         </section>
 
-        <!-- Section 3: Manage Content (This is all that's left) -->
+        <!-- Manage Content Table -->
         <section class="bg-gray-800 p-6 rounded-lg shadow-lg mt-8">
             <h2 class="text-2xl font-semibold mb-6">Manage Content</h2>
             
@@ -117,7 +117,7 @@ try {
         </section>
 
     </div>
-    <!-- All JavaScript has been removed from this file -->
 </body>
 </html>
+
 
