@@ -22,7 +22,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $genre = $_POST['series_genre'] ?? null;
         $episode_type = $_POST['episode_type'] ?? null;
 
-        if (empty($title) || empty($description) || empty($poster_url) || empty($genre) || empty($episode_type)) {
+        // Use more precise checks (not empty()) to allow '0' but not null or ''
+        if (!isset($title) || $title === '' || !isset($description) || $description === '' || !isset($poster_url) || $poster_url === '' || !isset($genre) || $genre === '' || !isset($episode_type) || $episode_type === '') {
             throw new Exception("All series fields (title, description, poster, genre) are required.");
         }
 
@@ -45,7 +46,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $ep_language = $_POST['merged_language'] ?? null;
             $duration_minutes = $_POST['merged_duration'] ?? null;
 
-            if (empty($season_number) || empty($ep_title) || empty($ep_video_url) || empty($duration_minutes) || empty($ep_language)) {
+            if (!isset($season_number) || $season_number === '' || !isset($ep_title) || $ep_title === '' || !isset($ep_video_url) || $ep_video_url === '' || !isset($duration_minutes) || $duration_minutes === '' || !isset($ep_language) || $ep_language === '') {
                 throw new Exception("All merged season fields (season, title, URL, language, duration) are required.");
             }
             $duration_seconds = $duration_minutes * 60;
@@ -73,8 +74,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $ep_languages = $_POST['ep_language'] ?? null;
             $ep_durations = $_POST['ep_duration'] ?? null;
 
-            if (empty($season_number) || empty($ep_titles) || !is_array($ep_titles) || empty($ep_titles[0])) {
-                throw new Exception("At least one episode is required for the season.");
+            if (!isset($season_number) || $season_number === '' || empty($ep_titles) || !is_array($ep_titles) || !isset($ep_titles[0]) || $ep_titles[0] === '') {
+                throw new Exception("At least one episode (and a season number) is required for the season.");
             }
 
             // 3b. Create the season
@@ -90,7 +91,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             
             for ($i = 0; $i < count($ep_titles); $i++) {
                 // Validate each episode's fields
-                if (empty($ep_titles[$i]) || empty($ep_numbers[$i]) || empty($ep_video_urls[$i]) || empty($ep_durations[$i]) || empty($ep_languages[$i])) {
+                // We check that the value is set and is not an empty string. '0' is allowed for number and duration.
+                if (!isset($ep_titles[$i]) || $ep_titles[$i] === '' || 
+                    !isset($ep_numbers[$i]) || $ep_numbers[$i] === '' || 
+                    !isset($ep_video_urls[$i]) || $ep_video_urls[$i] === '' || 
+                    !isset($ep_durations[$i]) || $ep_durations[$i] === '' ||
+                    !isset($ep_languages[$i]) || $ep_languages[$i] === '') {
+                    
                     throw new Exception("All fields (title, #, URL, language, duration) for Episode " . ($i+1) . " are required.");
                 }
                 $duration_seconds = $ep_durations[$i] * 60;
