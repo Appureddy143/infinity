@@ -32,7 +32,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             INSERT INTO movies (title, description, poster_url, genre, is_series, type)
             VALUES (?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$title, $description, $poster_url, $genre, true, 'series']); 
+        
+        // --- FIX: Manually check for execute() failure ---
+        if ($stmt->execute([$title, $description, $poster_url, $genre, true, 'series']) === false) {
+            throw new Exception("Failed to insert series: " . implode(", ", $stmt->errorInfo()));
+        }
+        
         $movie_id = $pdo->lastInsertId();
 
         // 3. Check which type of episodes to add
@@ -53,7 +58,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
             // 3b. Create the season
             $stmt = $pdo->prepare("INSERT INTO seasons (movie_id, season_number) VALUES (?, ?)");
-            $stmt->execute([$movie_id, $season_number]);
+            
+            // --- FIX: Manually check for execute() failure ---
+            if ($stmt->execute([$movie_id, $season_number]) === false) {
+                 throw new Exception("Failed to create season: " . implode(", ", $stmt->errorInfo()));
+            }
             $season_id = $pdo->lastInsertId();
 
             // 3c. Add the single merged episode
@@ -61,7 +70,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 INSERT INTO episodes (movie_id, season_id, episode_number, title, video_url, duration, language)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             ");
-            $stmt->execute([$movie_id, $season_id, 1, $ep_title, $ep_video_url, $duration_seconds, $ep_language]);
+
+            // --- FIX: Manually check for execute() failure ---
+            if ($stmt->execute([$movie_id, $season_id, 1, $ep_title, $ep_video_url, $duration_seconds, $ep_language]) === false) {
+                throw new Exception("Failed to add merged episode: " . implode(", ", $stmt->errorInfo()));
+            }
 
         } else {
             // --- ADDING EPISODIC FILES ---
@@ -80,7 +93,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
             // 3b. Create the season
             $stmt = $pdo->prepare("INSERT INTO seasons (movie_id, season_number) VALUES (?, ?)");
-            $stmt->execute([$movie_id, $season_number]);
+            
+            // --- FIX: Manually check for execute() failure ---
+            if ($stmt->execute([$movie_id, $season_number]) === false) {
+                throw new Exception("Failed to create season: " . implode(", ", $stmt->errorInfo()));
+            }
             $season_id = $pdo->lastInsertId();
 
             // 3c. Loop through each episode and add it
@@ -91,7 +108,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             
             for ($i = 0; $i < count($ep_titles); $i++) {
                 // Validate each episode's fields
-                // We check that the value is set and is not an empty string. '0' is allowed for number and duration.
                 if (!isset($ep_titles[$i]) || $ep_titles[$i] === '' || 
                     !isset($ep_numbers[$i]) || $ep_numbers[$i] === '' || 
                     !isset($ep_video_urls[$i]) || $ep_video_urls[$i] === '' || 
@@ -101,7 +117,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     throw new Exception("All fields (title, #, URL, language, duration) for Episode " . ($i+1) . " are required.");
                 }
                 $duration_seconds = $ep_durations[$i] * 60;
-                $stmt->execute([
+                
+                // --- FIX: Manually check for execute() failure ---
+                if ($stmt->execute([
                     $movie_id,
                     $season_id,
                     $ep_numbers[$i],
@@ -109,7 +127,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $ep_video_urls[$i],
                     $duration_seconds,
                     $ep_languages[$i]
-                ]);
+                ]) === false) {
+                    throw new Exception("Failed to add Episode " . ($i+1) . ": " . implode(", ", $stmt->errorInfo()));
+                }
             }
         }
 
