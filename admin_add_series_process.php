@@ -13,6 +13,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // All database operations will be in a transaction
     $pdo->beginTransaction();
 
+    // --- THIS IS THE FIX ---
+    // Force the connection to throw exceptions on SQL errors.
+    // This will stop the "transaction aborted" error and give the real error.
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
     try {
         // --- NEW SERVER-SIDE VALIDATION ---
         // 1. Validate Common Series Details
@@ -33,10 +38,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             VALUES (?, ?, ?, ?, ?, ?)
         ");
         
-        // --- FIX: Manually check for execute() failure ---
-        if ($stmt->execute([$title, $description, $poster_url, $genre, true, 'series']) === false) {
-            throw new Exception("Failed to insert series: " . implode(", ", $stmt->errorInfo()));
-        }
+        // We no longer need the manual 'if === false' checks because of the new line above.
+        $stmt->execute([$title, $description, $poster_url, $genre, true, 'series']);
         
         $movie_id = $pdo->lastInsertId();
 
@@ -58,11 +61,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
             // 3b. Create the season
             $stmt = $pdo->prepare("INSERT INTO seasons (movie_id, season_number) VALUES (?, ?)");
-            
-            // --- FIX: Manually check for execute() failure ---
-            if ($stmt->execute([$movie_id, $season_number]) === false) {
-                 throw new Exception("Failed to create season: " . implode(", ", $stmt->errorInfo()));
-            }
+            $stmt->execute([$movie_id, $season_number]);
             $season_id = $pdo->lastInsertId();
 
             // 3c. Add the single merged episode
@@ -70,11 +69,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 INSERT INTO episodes (movie_id, season_id, episode_number, title, video_url, duration, language)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
             ");
-
-            // --- FIX: Manually check for execute() failure ---
-            if ($stmt->execute([$movie_id, $season_id, 1, $ep_title, $ep_video_url, $duration_seconds, $ep_language]) === false) {
-                throw new Exception("Failed to add merged episode: " . implode(", ", $stmt->errorInfo()));
-            }
+            $stmt->execute([$movie_id, $season_id, 1, $ep_title, $ep_video_url, $duration_seconds, $ep_language]);
 
         } else {
             // --- ADDING EPISODIC FILES ---
@@ -93,11 +88,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
             // 3b. Create the season
             $stmt = $pdo->prepare("INSERT INTO seasons (movie_id, season_number) VALUES (?, ?)");
-            
-            // --- FIX: Manually check for execute() failure ---
-            if ($stmt->execute([$movie_id, $season_number]) === false) {
-                throw new Exception("Failed to create season: " . implode(", ", $stmt->errorInfo()));
-            }
+            $stmt->execute([$movie_id, $season_number]);
             $season_id = $pdo->lastInsertId();
 
             // 3c. Loop through each episode and add it
@@ -118,8 +109,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 }
                 $duration_seconds = $ep_durations[$i] * 60;
                 
-                // --- FIX: Manually check for execute() failure ---
-                if ($stmt->execute([
+                $stmt->execute([
                     $movie_id,
                     $season_id,
                     $ep_numbers[$i],
@@ -127,9 +117,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $ep_video_urls[$i],
                     $duration_seconds,
                     $ep_languages[$i]
-                ]) === false) {
-                    throw new Exception("Failed to add Episode " . ($i+1) . ": " . implode(", ", $stmt->errorInfo()));
-                }
+                ]);
             }
         }
 
@@ -144,6 +132,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($pdo->inTransaction()) {
             $pdo->rollBack();
         }
+        
+        // Now $e->getMessage() will contain the *real* database error
+        // (e.g., "Not null violation") instead of "transaction aborted"
         header('Location: admin.php?error=Failed to add series: ' . urlencode($e->getMessage()));
         exit;
     }
