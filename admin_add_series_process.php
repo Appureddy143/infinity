@@ -22,11 +22,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     try {
         // 1. Insert the main series into the 'movies' table
+        // --- THIS QUERY IS NOW FIXED ---
+        // Added the 'type' column to the INSERT statement
         $stmt = $pdo->prepare("
-            INSERT INTO movies (title, description, poster_url, genre, is_series)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO movies (title, description, poster_url, genre, is_series, type)
+            VALUES (?, ?, ?, ?, ?, ?)
         ");
-        $stmt->execute([$title, $description, $poster_url, $genre, true]); // is_series is true
+        // is_series is true, 'type' is 'Series'
+        $stmt->execute([$title, $description, $poster_url, $genre, true, 'Series']); 
         $movie_id = $pdo->lastInsertId();
 
         // 2. Check which type of episodes to add
