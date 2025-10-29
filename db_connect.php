@@ -1,38 +1,40 @@
 <?php
-// Start the session (required for session-based authentication)
-session_start();
+// --- THIS IS THE FIX ---
+// Only start a new session if one isn't already active.
+// This should be the *only* place in your entire app that calls session_start().
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Database connection details (replace with your actual Neon credentials)
-$host = getenv('DB_HOST') ?: 'your_default_host';  // Use env vars for security
-$port = getenv('DB_PORT') ?: 5432;
-$dbname = getenv('DB_NAME') ?: 'your_default_db';
-$username = getenv('DB_USER') ?: 'your_default_user';
-$password = getenv('DB_PASS') ?: 'your_default_pass';
+// Database connection details from Render Environment Variables
+$host = getenv('DB_HOST');
+$port = getenv('DB_PORT');
+$db = getenv('DB_NAME');
+$user = getenv('DB_USER');
+$pass = getenv('DB_PASS');
+
+// Create the connection string (DSN) for PostgreSQL
+$dsn = "pgsql:host=$host;port=$port;dbname=$db;user=$user;password=$pass";
 
 try {
-    // Create PDO connection
-    $pdo = new PDO("pgsql:host=$host;port=$port;dbname=$dbname", $username, $password);
+    // Create the PDO database connection
+    $pdo = new PDO($dsn);
     
-    // Force PDO to throw exceptions on ALL database errors (this fixes the "transaction aborted" issue)
+    // Set the PDO error mode to exception
+    // This will make your try/catch blocks work correctly
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-    
-    // Optional: Set default fetch mode for consistency
-    $pdo->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    // Handle connection errors gracefully
-    die("Database connection failed: " . $e->getMessage());
-}
 
-// Optional: Fetch current user if logged in (for use in other files)
-$currentUser = null;
-if (isset($_SESSION['user_id'])) {
-    try {
-        $stmt = $pdo->prepare("SELECT id, email, is_admin FROM users WHERE id = ?");
+    // Store the current user in a global variable, if logged in
+    $currentUser = null;
+    if (isset($_SESSION['user_id'])) {
+        $stmt = $pdo->prepare("SELECT user_id, email, is_admin FROM users WHERE user_id = ?");
         $stmt->execute([$_SESSION['user_id']]);
-        $currentUser = $stmt->fetch();
-    } catch (PDOException $e) {
-        // Log error if needed, but don't die here
-        error_log("Error fetching user: " . $e->getMessage());
+        $currentUser = $stmt->fetch(PDO::FETCH_ASSOC);
     }
+
+} catch (PDOException $e) {
+    // This will stop the script and show a user-friendly error
+    die("Could not connect to the database: " . $e->getMessage());
 }
 ?>
+
