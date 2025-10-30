@@ -5,6 +5,12 @@ if (session_status() == PHP_SESSION_NONE) {
 }
 require 'db_connect.php';
 
+// --- THIS IS THE FIX ---
+// Force the PDO connection to throw exceptions.
+// This will catch the *real* error, not the "transaction aborted" error.
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+// --- END OF FIX ---
+
 // Security Check: Make sure user is an admin
 if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     header('Location: login.php?error=Access denied. Admins only.');
@@ -485,3 +491,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </script>
 </body>
 </html>
+
+
