@@ -1,5 +1,4 @@
 <?php
-// --- THIS IS THE FIX ---
 // Only start a new session if one isn't already active.
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
@@ -15,8 +14,6 @@ $pass = getenv('DB_PASS');
 // Create the connection string (DSN) for PostgreSQL
 $dsn = "pgsql:host=$host;port=$port;dbname=$db;user=$user;password=$pass";
 
-// --- THIS IS THE FIX ---
-// We remove the try...catch block.
 // We let the script *calling* this file (e.g., login_process.php)
 // handle the connection error. This prevents the "die()" command
 // from printing output and causing the "headers already sent" error.
@@ -41,5 +38,6 @@ if (isset($_SESSION['user_id'])) {
         $currentUser = null;
     }
 }
-
-// The closing "?>" tag is removed to prevent whitespace errors.
+// --- THIS IS THE FIX ---
+// The file now ends *exactly* here.
+// There are no comments, blank lines, or closing tags after this point.
