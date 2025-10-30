@@ -1,61 +1,61 @@
 <?php
-session_start();
-require 'db_connect.php'; // This connects to your Neon database
+// --- THIS IS THE FIX ---
+// We must start the session *before* db_connect.php is required.
+// We also make sure one isn't already active.
+if (session_status() == PHP_SESSION_NONE) {
+    session_start();
+}
 
-// Check if form is submitted
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    
-    // Check if email and password are set
-    if (!isset($_POST['email']) || !isset($_POST['password'])) {
-        header('Location: login.php?error=Missing email or password.');
+// --- THIS IS THE FIX ---
+// We wrap the *entire* script, including the 'require', in a try...catch block.
+// This will catch any connection errors from db_connect.php
+// AND any query errors from this script.
+try {
+    require 'db_connect.php';
+
+    $email = $_POST['email'] ?? null;
+    $password = $_POST['password'] ?? null;
+
+    if (!$email || !$password) {
+        header('Location: login.php?error=Email and password are required.');
         exit;
     }
 
-    $email = $_POST['email'];
-    $password = $_POST['password'];
+    $stmt = $pdo->prepare("SELECT user_id, email, password_hash, is_admin FROM users WHERE email = ?");
+    $stmt->execute([$email]);
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // 1. Find the user by email
-    try {
-        $stmt = $pdo->prepare("SELECT user_id, email, password_hash, is_admin FROM users WHERE email = ?");
-        $stmt->execute([$email]);
-        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+    // Check if user exists AND has a password
+    if ($user && $user['password_hash'] && password_verify($password, $user['password_hash'])) {
+        // Password is correct!
+        
+        // Regenerate session ID for security
+        session_regenerate_id(true); 
+        
+        $_SESSION['user_id'] = $user['user_id'];
+        $_SESSION['email'] = $user['email'];
+        $_SESSION['is_admin'] = $user['is_admin'];
 
-        // 2. Verify the user and password
-        // FIX: Check if $user was found AND if password_hash is not null
-        // This prevents the "Passing null to parameter #2" error.
-        if ($user && isset($user['password_hash']) && password_verify($password, $user['password_hash'])) {
-            
-            // Password is correct!
-            // 3. Set session variables
-            $_SESSION['user_id'] = $user['user_id'];
-            $_SESSION['user_email'] = $user['email'];
-            $_SESSION['is_admin'] = (bool)$user['is_admin'];
-
-            // 4. Redirect to the appropriate page
-            if ($_SESSION['is_admin']) {
-                header('Location: admin.php');
-            } else {
-                header('Location: profile.php');
-            }
+        // Redirect admin to admin panel, others to profile
+        if ($user['is_admin']) {
+            header('Location: admin.php');
             exit;
-
         } else {
-            // Invalid email or password
-            header('Location: login.php?error=Invalid email or password.');
+            header('Location: profile.php');
             exit;
         }
-
-    } catch (PDOException $e) {
-        // Database error
-        // In production, you'd log this error instead of showing it
-        header('Location: login.php?error=A database error occurred.');
-        // error_log($e->getMessage()); // For logging
+    } else {
+        // Invalid email or password
+        header('Location: login.php?error=Invalid email or password.');
         exit;
     }
 
-} else {
-    // If someone tries to access this page directly
-    header('Location: login.php');
+} catch (PDOException $e) {
+    // This one catch block will now handle *all* database errors,
+    // including the connection error from db_connect.php.
+    // It will always send a header, never a "die()" message.
+    header('Location: login.php?error=' . urlencode($e->getMessage()));
     exit;
 }
-?>
+
+// The closing "?>" tag is removed to prevent whitespace errors.
