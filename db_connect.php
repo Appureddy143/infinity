@@ -1,7 +1,6 @@
 <?php
 // --- THIS IS THE FIX ---
 // Only start a new session if one isn't already active.
-// This should be the *only* place in your entire app that calls session_start().
 if (session_status() == PHP_SESSION_NONE) {
     session_start();
 }
@@ -16,29 +15,31 @@ $pass = getenv('DB_PASS');
 // Create the connection string (DSN) for PostgreSQL
 $dsn = "pgsql:host=$host;port=$port;dbname=$db;user=$user;password=$pass";
 
-try {
-    // Create the PDO database connection
-    $pdo = new PDO($dsn);
-    
-    // Set the PDO error mode to exception
-    // This will make your try/catch blocks work correctly
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+// --- THIS IS THE FIX ---
+// We remove the try...catch block.
+// We let the script *calling* this file (e.g., login_process.php)
+// handle the connection error. This prevents the "die()" command
+// from printing output and causing the "headers already sent" error.
 
-    // Store the current user in a global variable, if logged in
-    $currentUser = null;
-    if (isset($_SESSION['user_id'])) {
+// Create the PDO database connection
+$pdo = new PDO($dsn);
+
+// Set the PDO error mode to exception
+$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+// Store the current user in a global variable, if logged in
+$currentUser = null;
+if (isset($_SESSION['user_id'])) {
+    // We wrap this in a try...catch in case the DB connection
+    // was successful but the user table has an issue.
+    try {
         $stmt = $pdo->prepare("SELECT user_id, email, is_admin FROM users WHERE user_id = ?");
         $stmt->execute([$_SESSION['user_id']]);
         $currentUser = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        // Don't die, just fail gracefully.
+        $currentUser = null;
     }
-
-} catch (PDOException $e) {
-    // This will stop the script and show a user-friendly error
-    die("Could not connect to the database: " . $e->getMessage());
 }
 
-// --- THIS IS THE FIX ---
-// The closing "?>" tag has been removed.
-// This prevents any whitespace/blank lines at the end of the file
-// from causing "headers already sent" errors.
-
+// The closing "?>" tag is removed to prevent whitespace errors.
